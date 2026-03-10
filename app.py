@@ -16,6 +16,27 @@ st.markdown("Build and track your stock portfolio in real time.")
 # --- Session State ---
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = {}
+    
+# --- Export / Import Portfolio ---
+col_export, col_import = st.columns(2)
+
+with col_export:
+    if st.session_state.portfolio:
+        portfolio_json = pd.Series(st.session_state.portfolio).to_json()
+        st.download_button(
+            label="Export Portfolio",
+            data=portfolio_json,
+            file_name="portfolio.json",
+            mime="application/json"
+        )
+
+with col_import:
+    uploaded_file = st.file_uploader("Import Portfolio", type="json")
+    if uploaded_file is not None:
+        imported = pd.read_json(uploaded_file, typ="series").to_dict()
+        st.session_state.portfolio = imported
+        st.success("Portfolio imported successfully.")
+        st.rerun()
 
 # --- Stock List ---
 stock_options = {
