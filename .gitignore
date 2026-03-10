@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (avoid committing personal financial data)
+data/*.csv
+data/*.xlsx
