@@ -6,7 +6,7 @@ import plotly.express as px
 from src.stocks import (
     get_sp500_stocks, get_ftse100_stocks, get_dax_stocks,
     get_cac40_stocks, get_smi_stocks, get_aex_stocks,
-    get_ibex_stocks, get_etfs, TICKER_COLORS
+    get_ibex_stocks, get_etfs, get_crypto, get_commodities, TICKER_COLORS
 )
 from src.fx import get_ticker_currency, get_fx_rate, CURRENCY_SYMBOLS
 from src.portfolio import build_portfolio_df, fetch_buy_price
@@ -124,7 +124,16 @@ if "imported" not in st.session_state:
 # ──────────────────────────────────────────────
 # Import Portfolio
 # ──────────────────────────────────────────────
-uploaded_file = st.file_uploader("Import Portfolio", type="json")
+st.caption("Build your own portfolio using the form below, import a saved JSON file, or load the sample portfolio to explore the dashboard.")
+col_import, col_sample = st.columns([3, 1], vertical_alignment="bottom")
+uploaded_file = col_import.file_uploader("Import Portfolio", type="json")
+if col_sample.button("Load Sample Portfolio", use_container_width=True):
+    import json, os
+    sample_path = os.path.join(os.path.dirname(__file__), "data", "sample_portfolio.json")
+    with open(sample_path) as f:
+        st.session_state.portfolio = json.load(f)
+    st.session_state.imported = False
+    st.rerun()
 
 if uploaded_file is not None and not st.session_state.imported:
     try:
@@ -167,7 +176,9 @@ def load_stock_options() -> dict:
         "SMI":      get_smi_stocks(),
         "AEX":      get_aex_stocks(),
         "IBEX 35":  get_ibex_stocks(),
-        "ETFs":     get_etfs(),
+        "ETFs":        get_etfs(),
+        "Crypto":      get_crypto(),
+        "Commodities": get_commodities(),
     }
 
 all_stock_options = load_stock_options()
@@ -178,6 +189,7 @@ all_stock_options = load_stock_options()
 st.subheader("Add Position")
 manual_price = st.session_state.get("manual_price_toggle", False)
 
+# Index selector first so we can adapt the rest of the form to it
 col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
 
 with col1:
@@ -193,14 +205,27 @@ with col1:
         index=None,
         placeholder="Search by name or ticker…"
     )
+
+alt_asset = index_choice in ("Crypto", "Commodities")
+
 with col2:
-    shares = st.number_input(
-        "Number of Shares",
-        min_value=0.0, value=None, step=1.0,
-        placeholder="e.g. 5"
-    )
+    if alt_asset:
+        amount_input = st.number_input(
+            f"Amount ({base_currency})",
+            min_value=0.0, value=None, step=1.0,
+            placeholder="e.g. 5000"
+        )
+        shares_input = None
+    else:
+        shares_input = st.number_input(
+            "Number of Shares",
+            min_value=0.0, value=None, step=1.0,
+            placeholder="e.g. 5"
+        )
+        amount_input = None
+
 with col3:
-    if manual_price:
+    if not alt_asset and manual_price:
         buy_price_input = st.number_input(
             f"Average Buy Price ({base_currency})",
             min_value=0.0, value=None, step=0.01,
@@ -209,35 +234,49 @@ with col3:
         purchase_date = None
     else:
         purchase_date = st.date_input(
-            "Purchase Date",
+            "Purchase Date" + (" (optional)" if alt_asset else ""),
             value=None,
             min_value=pd.Timestamp("1980-01-01").date(),
             max_value=pd.Timestamp.today().date()
         )
         buy_price_input = None
+
 with col4:
-    st.markdown("<div style='margin-top: 36px;'>", unsafe_allow_html=True)
-    manual_price = st.checkbox("Enter price manually", key="manual_price_toggle")
-    st.markdown("</div>", unsafe_allow_html=True)
+    if not alt_asset:
+        st.markdown("<div style='margin-top: 36px;'>", unsafe_allow_html=True)
+        manual_price = st.checkbox("Enter price manually", key="manual_price_toggle")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 if st.button("Add to Portfolio"):
-    if selected is None or shares is None or shares == 0:
-        st.warning("Please fill in all fields.")
-    elif not manual_price and purchase_date is None:
+    if selected is None:
+        st.warning("Please select a stock.")
+    elif not alt_asset and (shares_input is None or shares_input == 0):
+        st.warning("Please enter the number of shares.")
+    elif alt_asset and (amount_input is None or amount_input == 0):
+        st.warning("Please enter the amount.")
+    elif not alt_asset and not manual_price and purchase_date is None:
         st.warning("Please select a purchase date or enter a price manually.")
-    elif manual_price and (buy_price_input is None or buy_price_input == 0):
+    elif not alt_asset and manual_price and (buy_price_input is None or buy_price_input == 0):
         st.warning("Please enter a valid buy price.")
     else:
         ticker = stock_options[selected]
 
-        if manual_price:
+        if not alt_asset and manual_price:
             buy_price = buy_price_input
-        else:
+        elif purchase_date is not None:
             buy_price = fetch_buy_price(ticker, str(purchase_date))
             if buy_price is None:
                 st.error("No price data found for that date. Try a different date.")
+        else:
+            buy_price = fetch_buy_price(ticker, str(pd.Timestamp.today().date()))
+            purchase_date = pd.Timestamp.today().date()
 
         if buy_price is not None:
+            if alt_asset:
+                shares = round(amount_input / buy_price, 6)
+            else:
+                shares = shares_input
+
             lot = {
                 "shares": shares,
                 "buy_price": buy_price,
@@ -245,7 +284,7 @@ if st.button("Add to Portfolio"):
                 "manual_price": manual_price
             }
             st.session_state.portfolio.setdefault(ticker, []).append(lot)
-            st.success(f"Added {shares:g} shares of {ticker} at {currency_symbol}{buy_price:,.2f}")
+            st.success(f"Added {shares:g} units of {ticker} at {currency_symbol}{buy_price:,.2f}")
 
 # ──────────────────────────────────────────────
 # Portfolio Display
