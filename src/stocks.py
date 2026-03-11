@@ -76,6 +76,25 @@ def get_ibex_stocks():
         suffix=".MC"
     )
 
+def get_crypto():
+    return {
+        "Bitcoin (BTC-USD)":  "BTC-USD",
+        "Ethereum (ETH-USD)": "ETH-USD",
+        "Solana (SOL-USD)":   "SOL-USD",
+        "XRP (XRP-USD)":      "XRP-USD",
+        "BNB (BNB-USD)":      "BNB-USD",
+    }
+
+def get_commodities():
+    return {
+        "Gold Futures (GC=F)":        "GC=F",
+        "Silver Futures (SI=F)":      "SI=F",
+        "Crude Oil WTI (CL=F)":       "CL=F",
+        "Natural Gas (NG=F)":         "NG=F",
+        "Gold ETF (GLD)":             "GLD",
+        "Silver ETF (SLV)":           "SLV",
+    }
+
 def get_etfs():
     return {
         "S&P 500 ETF (SPY)": "SPY",
@@ -146,4 +165,16 @@ TICKER_COLORS = {
     "NESN.SW":  "#e2001a",  # Nestlé red
     "NOVN.SW":  "#0460a9",  # Novartis blue
     "ROG.SW":   "#009fe3",  # Roche blue
+    # Crypto
+    "BTC-USD":  "#f7931a",  # Bitcoin orange
+    "ETH-USD":  "#627eea",  # Ethereum purple
+    "SOL-USD":  "#9945ff",  # Solana purple
+    "XRP-USD":  "#346aa9",  # XRP blue
+    "BNB-USD":  "#f3ba2f",  # BNB yellow
+    # Commodities
+    "GC=F":     "#ffd700",  # Gold
+    "SI=F":     "#c0c0c0",  # Silver
+    "GLD":      "#ffd700",  # Gold ETF
+    "SLV":      "#c0c0c0",  # Silver ETF
+    "CL=F":     "#1a1a2e",  # Crude Oil dark
 }
