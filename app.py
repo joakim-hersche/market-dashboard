@@ -3,7 +3,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-from src.localstorage_component import ls_get, ls_set
+import os
 
 from src.stocks import (
     get_sp500_stocks, get_ftse100_stocks, get_dax_stocks,
@@ -172,28 +172,37 @@ currency_symbol = CURRENCY_SYMBOLS[base_currency]
 # Session State
 # ──────────────────────────────────────────────
 
-# localStorage: restore portfolio and currency from previous session.
-# ls_get returns None on the first render (component not yet ready),
-# then the stored string on the next render — guard with ls_loaded.
-_LS_KEY = "market_dashboard_portfolio"
+# File-based persistence — survives page refresh without any JavaScript.
+# Saved to .portfolio_state.json in the project directory (gitignored).
+_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".portfolio_state.json")
 
-if "ls_loaded" not in st.session_state:
-    _ls_data = ls_get(_LS_KEY)
-    if _ls_data is not None:
-        st.session_state.ls_loaded = True
-        if _ls_data:
-            try:
-                _parsed = json.loads(_ls_data)
-                if isinstance(_parsed, dict):
-                    if "portfolio" in _parsed:
-                        st.session_state.portfolio = _parsed["portfolio"]
-                    if "currency" in _parsed:
-                        st.session_state.currency = _parsed["currency"]
-            except Exception:
-                pass
+def _load_state() -> dict | None:
+    try:
+        with open(_STATE_FILE) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return None
+
+def _save_state() -> None:
+    try:
+        with open(_STATE_FILE, "w") as f:
+            json.dump({
+                "portfolio": st.session_state.portfolio,
+                "currency": st.session_state.currency,
+            }, f)
+    except Exception:
+        pass
 
 if "portfolio" not in st.session_state:
-    st.session_state.portfolio = {}
+    _saved = _load_state()
+    if _saved:
+        st.session_state.portfolio = _saved.get("portfolio", {})
+        st.session_state.currency = _saved.get("currency", list(CURRENCY_SYMBOLS.keys())[0])
+    else:
+        st.session_state.portfolio = {}
 
 if "currency" not in st.session_state:
     st.session_state.currency = list(CURRENCY_SYMBOLS.keys())[0]
@@ -207,12 +216,7 @@ if "confirm_clear" not in st.session_state:
 if "pending_remove" not in st.session_state:
     st.session_state.pending_remove = None
 
-# localStorage: persist portfolio + currency on every render (once initial load is done).
-if st.session_state.get("ls_loaded"):
-    ls_set(_LS_KEY, json.dumps({
-        "portfolio": st.session_state.portfolio,
-        "currency": st.session_state.currency,
-    }))
+_save_state()
 
 # ──────────────────────────────────────────────
 # Stock List
