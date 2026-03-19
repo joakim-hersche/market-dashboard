@@ -219,7 +219,7 @@ async def index(request: Request):
 
             def _open_about():
                 with ui.dialog() as dlg, ui.card().style(
-                    f"min-width:380px; max-width:480px; background:{BG_CARD}; border:1px solid {BORDER};"
+                    f"min-width:380px; max-width:480px; background:{BG_CARD}; border:1px solid rgba(255,255,255,0.12);"
                     f" border-radius:10px; padding:20px;"
                 ):
                     ui.label("Market Dashboard").style(
