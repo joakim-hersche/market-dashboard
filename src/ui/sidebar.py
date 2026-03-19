@@ -291,9 +291,10 @@ def build_sidebar(
         date_input.value = ""
         detail_container.set_visibility(False)
 
-        positions_list.refresh()
+        # Update color map + tabs first, then refresh sidebar with new colors
         if on_mutation and on_mutation.get("fn"):
             await on_mutation["fn"]()
+        positions_list.refresh()
 
     _add_handler["fn"] = on_add_position
     shares_input.on("keydown.enter", on_add_position)
@@ -363,9 +364,9 @@ def build_sidebar(
                     stored["portfolio"] = portfolio
                     save_portfolio(stored)
                     d.close()
-                    positions_list.refresh()
                     if on_mutation and on_mutation.get("fn"):
                         await on_mutation["fn"]()
+                    positions_list.refresh()
 
                     undo_state = {"undone": False}
 
@@ -377,9 +378,9 @@ def build_sidebar(
                         stored2 = load_portfolio()
                         stored2["portfolio"] = portfolio
                         save_portfolio(stored2)
-                        positions_list.refresh()
                         if on_mutation and on_mutation.get("fn"):
                             await on_mutation["fn"]()
+                        positions_list.refresh()
                         ui.notify(f"Restored {t}", type="positive")
 
                     with ui.notification(f"Removed {t}", timeout=5):
@@ -422,9 +423,9 @@ def build_sidebar(
             stored["portfolio"] = portfolio
             save_portfolio(stored)
             ui.notify("Portfolio imported.", type="positive")
-            positions_list.refresh()
             if on_mutation and on_mutation.get("fn"):
                 await on_mutation["fn"]()
+            positions_list.refresh()
         except Exception:
             ui.notify("Could not read the file.", type="negative")
 
@@ -456,9 +457,9 @@ def build_sidebar(
                     save_portfolio(stored)
                     d.close()
                     ui.notify("Sample portfolio loaded.", type="positive")
-                    positions_list.refresh()
                     if on_mutation and on_mutation.get("fn"):
                         await on_mutation["fn"]()
+                    positions_list.refresh()
 
                 ui.button("Load Sample", on_click=do_load, color="blue").props("flat")
         dialog.open()
@@ -480,9 +481,9 @@ def build_sidebar(
                     save_portfolio(stored)
                     d.close()
                     ui.notify("Portfolio cleared.", type="info")
-                    positions_list.refresh()
                     if on_mutation and on_mutation.get("fn"):
                         await on_mutation["fn"]()
+                    positions_list.refresh()
 
                 ui.button("Clear All", on_click=do_clear, color="red").props("flat")
         dialog.open()
