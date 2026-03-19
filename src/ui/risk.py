@@ -105,6 +105,10 @@ def _render_unified_table(
             "<b>Valuation</b> \u2014 price/earnings ratio, dividend yield, "
             "52-week price range with current position, and latest market price."
         )
+        _section_intro(
+            "Colour coding uses common industry thresholds for context. "
+            "It does not indicate whether a position is suitable for your circumstances."
+        )
 
         if portfolio_df.empty:
             ui.html(
@@ -384,6 +388,10 @@ def _render_flat_table(
             "return-per-unit-of-risk score, and market sensitivity (beta).<br>"
             "<b>Valuation</b> \u2014 price/earnings ratio, dividend yield, "
             "52-week price range with current position, and latest market price."
+        )
+        _section_intro(
+            "Colour coding uses common industry thresholds for context. "
+            "It does not indicate whether a position is suitable for your circumstances."
         )
 
         if portfolio_df.empty:
@@ -699,7 +707,7 @@ def _render_correlation_heatmap(price_data: dict, tickers: list) -> None:
                         f'<div style="font-size:11px;color:{TEXT_DIM};margin-top:8px;">'
                         f'Most correlated: {max_pair[0]} & {max_pair[1]} ({max_val:.2f}). '
                         f'Least correlated: {min_pair[0]} & {min_pair[1]} ({min_val:.2f}) '
-                        f'— good for diversification.</div>'
+                        f'— returns moved most independently.</div>'
                     )
 
 
@@ -796,6 +804,13 @@ def _render_rebalancing_calculator(portfolio_df: pd.DataFrame, currency_symbol: 
             "Set target weights for each ticker and enter a deposit amount. "
             "The calculator suggests buy-only actions to bring the portfolio "
             "closer to your targets. It will never suggest selling."
+        )
+        ui.html(
+            f'<div style="background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.3);'
+            f'border-radius:6px;padding:8px 12px;margin-bottom:8px;">'
+            f'<span style="color:{AMBER};font-size:11px;">'
+            'This is a mechanical calculation, not a recommendation. '
+            'Consult a qualified adviser before making investment decisions.</span></div>'
         )
 
         if portfolio_df.empty:
@@ -896,7 +911,7 @@ def _render_rebalancing_calculator(portfolio_df: pd.DataFrame, currency_symbol: 
                     drift_val = a["Drift"]
                     drift_cls = "td-pos" if drift_val > 0.5 else ("td-neg" if drift_val < -0.5 else "")
                     shares = a["Shares to Buy"]
-                    action_text = f"Buy {shares}" if shares > 0 else "\u2014"
+                    action_text = f"+{shares} shares" if shares > 0 else "\u2014"
                     action_cls = "td-pos" if shares > 0 else ""
                     amount_text = f"{currency_symbol}{a['Amount']:.2f}" if shares > 0 else "\u2014"
 
@@ -929,7 +944,7 @@ def _render_rebalancing_calculator(portfolio_df: pd.DataFrame, currency_symbol: 
                         <th scope="col" class="right">Current %</th>
                         <th scope="col" class="right">Target %</th>
                         <th scope="col" class="right">Drift</th>
-                        <th scope="col">Action</th>
+                        <th scope="col">Suggested</th>
                         <th scope="col" class="right">Amount</th>
                     </tr></thead>
                     <tbody>{rows_html}</tbody>
