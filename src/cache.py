@@ -2,16 +2,31 @@
 
 Replaces @st.cache_data decorators with cachetools TTLCache so the data layer
 has no Streamlit dependency.
+
+NOTE: All caches are in-memory only and process-local.  A server restart
+means a cold start for every user — all yfinance / FX data will be
+re-fetched on the first request after restart.
 """
 
 import hashlib
+import logging
 import pickle
 
 from cachetools import TTLCache, cached
 from cachetools.keys import hashkey
 
-short_cache = TTLCache(maxsize=256, ttl=900)     # 15 min — live prices, FX rates
+_log = logging.getLogger(__name__)
+_log.info("Cache cold start — all data will be fetched fresh from upstream APIs")
+
+short_cache = TTLCache(maxsize=256, ttl=300)      # 5 min — live prices, FX rates
 long_cache  = TTLCache(maxsize=256, ttl=86400)   # 24 hours — fundamentals, history
+
+# Per-function long caches to avoid key collisions when different functions
+# receive the same arguments (e.g. fetch_price_history_long("AAPL") vs
+# fetch_company_name("AAPL") would collide in a shared cache).
+long_cache_history = TTLCache(maxsize=256, ttl=86400)
+long_cache_fundamentals = TTLCache(maxsize=256, ttl=86400)
+long_cache_names = TTLCache(maxsize=256, ttl=86400)
 
 
 def _make_hashable(obj):
@@ -21,6 +36,19 @@ def _make_hashable(obj):
         return obj
     except TypeError:
         return hashlib.md5(pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)).hexdigest()
+
+
+import requests
+
+
+class _TimeoutSession(requests.Session):
+    """Session that enforces a default timeout on all requests."""
+    def request(self, *args, **kwargs):
+        kwargs.setdefault("timeout", 15)
+        return super().request(*args, **kwargs)
+
+
+yf_session = _TimeoutSession()
 
 
 def lenient_key(*args, **kwargs):

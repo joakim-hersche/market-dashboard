@@ -1,8 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import yfinance as yf
 import pandas as pd
 from cachetools import cached
 
-from src.cache import short_cache, long_cache, lenient_key
+from src.cache import short_cache, long_cache, lenient_key, yf_session
 from src.fx import get_ticker_currency, get_fx_rate
 
 
@@ -71,7 +73,7 @@ def _dividends_in_base_currency(
     """Sum dividends per share from purchase_date to today, converted at historical FX rates."""
     try:
         today = str(pd.Timestamp.today().date())
-        ticker_obj = yf.Ticker(ticker)
+        ticker_obj = yf.Ticker(ticker, session=yf_session)
         hist = ticker_obj.history(start=purchase_date, end=today)
         if hist.empty or "Dividends" not in hist.columns:
             return 0.0
@@ -88,9 +90,9 @@ def _dividends_in_base_currency(
         fx_from = "GBP" if gbx else from_currency
         fx_pair = f"{fx_from}{base_currency}=X"
 
-        fx_hist = yf.Ticker(fx_pair).history(start=purchase_date, end=today)
+        fx_hist = yf.Ticker(fx_pair, session=yf_session).history(start=purchase_date, end=today)
         if fx_hist.empty:
-            fallback = get_fx_rate(from_currency, base_currency)
+            fallback, _ = get_fx_rate(from_currency, base_currency)
             return float(dividends.sum() * fallback)
 
         fx_series = fx_hist["Close"].reindex(dividends.index, method="ffill")
@@ -112,16 +114,56 @@ def build_portfolio_df(portfolio: dict, base_currency: str) -> pd.DataFrame:
     All prices are converted to base_currency.
     """
     rows = []
+    tickers = list(portfolio.keys())
+    if not tickers:
+        return pd.DataFrame()
+
+    # Batch-fetch all ticker prices in a single HTTP request
+    batch_data = yf.download(tickers, period="5d", group_by="ticker", progress=False, threads=True)
+
+    # Fetch FX rates and dividends in parallel
+    def _fetch_extras(ticker):
+        ticker_ccy = get_ticker_currency(ticker)
+        fx_rate, _ = get_fx_rate(ticker_ccy, base_currency)
+        div_cache = {}
+        for lot in portfolio[ticker]:
+            pd_date = lot.get("purchase_date")
+            if pd_date and pd_date != "Manual" and pd_date not in div_cache:
+                div_cache[pd_date] = _dividends_in_base_currency(ticker, pd_date, ticker_ccy, base_currency)
+        return ticker, fx_rate, div_cache
+
+    extras = {}
+    with ThreadPoolExecutor(max_workers=min(10, len(tickers))) as executor:
+        futures = {executor.submit(_fetch_extras, t): t for t in tickers}
+        for future in as_completed(futures):
+            try:
+                ticker, fx_rate, div_cache = future.result()
+                extras[ticker] = (fx_rate, div_cache)
+            except Exception:
+                continue
 
     for ticker, lots in portfolio.items():
-        t = yf.Ticker(ticker)
-        data = t.history(period="5d")
-        if len(data) < 2:
+        # Extract this ticker's data from the batch result
+        if len(tickers) == 1:
+            data = batch_data
+        else:
+            try:
+                data = batch_data[ticker]
+            except (KeyError, TypeError):
+                continue
+        if data.empty or "Close" not in data.columns:
+            continue
+        close = data["Close"].dropna()
+        if len(close) < 2:
             continue
 
-        fx_rate = get_fx_rate(get_ticker_currency(ticker), base_currency)
-        current_price = data["Close"].iloc[-1] * fx_rate
-        prev_price = data["Close"].iloc[-2] * fx_rate
+        extra = extras.get(ticker)
+        if extra is None:
+            continue
+        fx_rate, div_cache = extra
+
+        current_price = float(close.iloc[-1]) * fx_rate
+        prev_price = float(close.iloc[-2]) * fx_rate
 
         for i, lot in enumerate(lots):
             shares = lot["shares"]
@@ -132,7 +174,7 @@ def build_portfolio_df(portfolio: dict, base_currency: str) -> pd.DataFrame:
             purchase_date = lot["purchase_date"]
 
             dividends_per_share = (
-                _dividends_in_base_currency(ticker, purchase_date, get_ticker_currency(ticker), base_currency)
+                div_cache.get(purchase_date, 0.0)
                 if purchase_date and purchase_date != "Manual"
                 else 0.0
             )
@@ -172,7 +214,7 @@ def fetch_buy_price(ticker: str, purchase_date: str) -> tuple[float, str] | None
     """
     try:
         end = str((pd.Timestamp(purchase_date) + pd.DateOffset(days=7)).date())
-        hist = yf.Ticker(ticker).history(start=purchase_date, end=end)
+        hist = yf.Ticker(ticker, session=yf_session).history(start=purchase_date, end=end)
         if hist.empty:
             return None
         actual_date = str(hist.index[0].date())

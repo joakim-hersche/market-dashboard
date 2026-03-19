@@ -4,19 +4,21 @@ All functions use cachetools TTLCache so they are called once per ticker per
 TTL window, with no framework dependency.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pandas as pd
 import yfinance as yf
 from cachetools import cached
 
-from src.cache import short_cache, long_cache, lenient_key
+from src.cache import short_cache, long_cache, long_cache_history, long_cache_fundamentals, long_cache_names, lenient_key, yf_session
 
 from src.fx import get_ticker_currency, CURRENCY_SYMBOLS
 from src.monte_carlo import run_monte_carlo_backtest, run_monte_carlo_portfolio, run_monte_carlo_ticker
 from src.stocks import (
     get_sp500_stocks, get_ftse100_stocks, get_dax_stocks,
     get_cac40_stocks, get_smi_stocks, get_aex_stocks,
-    get_ibex_stocks, get_etfs, get_crypto, get_commodities,
-    get_reits, get_bonds, get_emerging_markets,
+    get_ibex_stocks, get_omx30_stocks, get_etfs, get_crypto,
+    get_commodities, get_reits, get_bonds, get_emerging_markets,
 )
 
 
@@ -24,29 +26,29 @@ from src.stocks import (
 def fetch_price_history_short(ticker: str) -> pd.DataFrame:
     """Fetch 6-month price history. Cached for 15 minutes."""
     try:
-        hist = yf.Ticker(ticker).history(period="6mo")
+        hist = yf.Ticker(ticker, session=yf_session).history(period="6mo")
         hist.index = hist.index.tz_localize(None)
         return hist
     except Exception:
         return pd.DataFrame()
 
 
-@cached(long_cache)
+@cached(long_cache_history)
 def fetch_price_history_long(ticker: str) -> pd.DataFrame:
     """Fetch full price history. Cached for 24 hours."""
     try:
-        hist = yf.Ticker(ticker).history(period="max")
+        hist = yf.Ticker(ticker, session=yf_session).history(period="max")
         hist.index = hist.index.tz_localize(None)
         return hist
     except Exception:
         return pd.DataFrame()
 
 
-@cached(long_cache)
+@cached(long_cache_fundamentals)
 def fetch_fundamentals(ticker: str) -> dict:
     """Fetch P/E, dividend yield, and 1-year range. Cached for 24 hours."""
     try:
-        info = yf.Ticker(ticker).info
+        info = yf.Ticker(ticker, session=yf_session).info
         current  = info.get("currentPrice") or info.get("regularMarketPrice")
         low_1y   = info.get("fiftyTwoWeekLow")
         high_1y  = info.get("fiftyTwoWeekHigh")
@@ -89,16 +91,17 @@ def fetch_fundamentals(ticker: str) -> dict:
             "1-Year Low":     round(low_1y, 2)     if low_1y  else None,
             "1-Year High":    round(high_1y, 2)    if high_1y else None,
             "1-Year Position": position,
+            "Current Price":  round(current, 2)    if current else None,
         }
     except Exception:
         return {}
 
 
-@cached(long_cache)
+@cached(long_cache_names)
 def fetch_company_name(ticker: str) -> str:
     """Fetch short company name. Falls back to ticker on failure."""
     try:
-        info = yf.Ticker(ticker).info
+        info = yf.Ticker(ticker, session=yf_session).info
         return info.get("shortName") or info.get("longName") or ticker
     except Exception:
         return ticker
@@ -108,7 +111,7 @@ def fetch_company_name(ticker: str) -> str:
 def fetch_simulation_history(ticker: str) -> pd.DataFrame:
     """Fetch up to 5-year price history for Monte Carlo simulation. Cached for 24 hours."""
     try:
-        hist = yf.Ticker(ticker).history(period="5y")
+        hist = yf.Ticker(ticker, session=yf_session).history(period="5y")
         hist.index = hist.index.tz_localize(None)
         return hist
     except Exception:
@@ -119,7 +122,7 @@ def fetch_simulation_history(ticker: str) -> pd.DataFrame:
 def fetch_analytics_history(ticker: str) -> pd.DataFrame:
     """Fetch 1-year price history for analytics. Cached for 24 hours."""
     try:
-        hist = yf.Ticker(ticker).history(period="1y")
+        hist = yf.Ticker(ticker, session=yf_session).history(period="1y")
         hist.index = hist.index.tz_localize(None)
         return hist
     except Exception:
@@ -130,7 +133,7 @@ def fetch_analytics_history(ticker: str) -> pd.DataFrame:
 def fetch_price_history_range(ticker: str, period: str) -> pd.DataFrame:
     """Fetch price history for a given period string (e.g. '3mo', '1y'). Cached for 15 minutes."""
     try:
-        hist = yf.Ticker(ticker).history(period=period)
+        hist = yf.Ticker(ticker, session=yf_session).history(period=period)
         hist.index = hist.index.tz_localize(None)
         return hist
     except Exception:
@@ -181,18 +184,28 @@ def cached_run_monte_carlo_ticker(
 @cached(long_cache)
 def load_stock_options() -> dict:
     """Load all available stock lists from Wikipedia scrapers. Cached for 24 hours."""
-    return {
-        "US — S&P 500":       get_sp500_stocks(),
-        "UK — FTSE 100":      get_ftse100_stocks(),
-        "Germany — DAX":      get_dax_stocks(),
-        "France — CAC 40":    get_cac40_stocks(),
-        "Switzerland — SMI":  get_smi_stocks(),
-        "Netherlands — AEX":  get_aex_stocks(),
-        "Spain — IBEX 35":    get_ibex_stocks(),
-        "ETFs":               get_etfs(),
-        "REITs":              get_reits(),
-        "Bonds":              get_bonds(),
-        "Emerging Markets":   get_emerging_markets(),
-        "Crypto":             get_crypto(),
-        "Commodities":        get_commodities(),
-    }
+    sources = [
+        ("US — S&P 500",       get_sp500_stocks),
+        ("UK — FTSE 100",      get_ftse100_stocks),
+        ("Germany — DAX",      get_dax_stocks),
+        ("France — CAC 40",    get_cac40_stocks),
+        ("Switzerland — SMI",  get_smi_stocks),
+        ("Netherlands — AEX",  get_aex_stocks),
+        ("Spain — IBEX 35",    get_ibex_stocks),
+        ("Sweden — OMX 30",    get_omx30_stocks),
+        ("ETFs",               get_etfs),
+        ("REITs",              get_reits),
+        ("Bonds",              get_bonds),
+        ("Emerging Markets",   get_emerging_markets),
+        ("Crypto",             get_crypto),
+        ("Commodities",        get_commodities),
+    ]
+
+    def _call(pair):
+        label, fn = pair
+        return label, fn()
+
+    with ThreadPoolExecutor(max_workers=len(sources)) as executor:
+        results = executor.map(_call, sources)
+
+    return dict(results)
