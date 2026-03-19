@@ -736,8 +736,12 @@ def _render_sector_breakdown(
     with ui.column().classes("chart-card w-full"):
         ui.html(
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<div style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
-            f'text-transform:uppercase;color:{TEXT_MUTED};">Sector Exposure</div>'
+            f'<div style="display:flex;align-items:center;gap:8px;">'
+            f'<span style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
+            f'text-transform:uppercase;color:{TEXT_MUTED};">Sector Exposure</span>'
+            f'<span style="font-size:8px;font-weight:600;color:{AMBER};background:rgba(217,119,6,0.15);'
+            f'padding:2px 6px;border-radius:4px;letter-spacing:0.05em;text-transform:uppercase;">WIP</span>'
+            f'</div>'
             f'<div style="font-size:10px;color:{TEXT_DIM};">by portfolio weight</div>'
             f'</div>'
         )
@@ -826,8 +830,12 @@ def _render_rebalancing_calculator(portfolio_df: pd.DataFrame, currency_symbol: 
     with ui.column().classes("chart-card w-full"):
         ui.html(
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<div style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
-            f'text-transform:uppercase;color:{TEXT_MUTED};">Rebalancing Calculator</div>'
+            f'<div style="display:flex;align-items:center;gap:8px;">'
+            f'<span style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
+            f'text-transform:uppercase;color:{TEXT_MUTED};">Rebalancing Calculator</span>'
+            f'<span style="font-size:8px;font-weight:600;color:{AMBER};background:rgba(217,119,6,0.15);'
+            f'padding:2px 6px;border-radius:4px;letter-spacing:0.05em;text-transform:uppercase;">WIP</span>'
+            f'</div>'
             f'<div style="font-size:10px;color:{TEXT_DIM};">buy-only</div>'
             f'</div>'
         )
