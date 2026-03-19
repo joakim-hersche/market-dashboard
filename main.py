@@ -722,7 +722,11 @@ def _build_sidebar(
             result = await run.io_bound(fetch_buy_price, ticker, str(purchase_date))
             notification.dismiss()
             if result is None:
-                ui.notify("No price data found for that date. Try a different date.", type="negative")
+                ui.notify(
+                    f"Could not fetch price for {ticker} on {purchase_date}. "
+                    "Check the ticker symbol and date, or try again if Yahoo Finance is slow.",
+                    type="negative",
+                )
                 return
             buy_price, actual_date = result
             if actual_date != str(purchase_date):

@@ -3,13 +3,11 @@ import pandas as pd
 import logging
 from cachetools import cached
 
-from src.cache import short_cache, long_cache
+from src.cache import short_cache, long_cache, yf_session
 
 _log = logging.getLogger(__name__)
 
-CURRENCY_SYMBOLS = {"USD": "$", "CHF": "CHF ", "EUR": "€", "GBP": "£"}
-
-TRADING_DAYS = 252  # Approximate trading days per year
+CURRENCY_SYMBOLS = {"USD": "$", "CHF": "CHF ", "EUR": "€", "GBP": "£", "SEK": "kr "}
 
 
 def normalize_gbx(value, currency: str):
@@ -31,19 +29,24 @@ def get_ticker_currency(ticker: str) -> str:
     return "USD"
 
 @cached(short_cache)
-def get_fx_rate(from_currency: str, to_currency: str) -> float:
-    """Fetch live FX rate between two currencies. GBX (pence) handled automatically."""
+def get_fx_rate(from_currency: str, to_currency: str) -> tuple[float, bool]:
+    """Fetch live FX rate between two currencies. GBX (pence) handled automatically.
+
+    Returns ``(rate, success)`` — when the lookup fails the rate is 1.0 and
+    *success* is False so callers can surface a warning to the user.
+    """
     if from_currency == to_currency:
-        return 1.0
+        return 1.0, True
     if from_currency == "GBX":
-        return get_fx_rate("GBP", to_currency) / 100
+        gbp_rate, ok = get_fx_rate("GBP", to_currency)
+        return gbp_rate / 100, ok
     try:
         pair = f"{from_currency}{to_currency}=X"
-        rate = yf.Ticker(pair).history(period="1d")["Close"].iloc[-1]
-        return float(rate)
-    except Exception:
-        _log.warning("FX lookup failed for %s→%s; falling back to 1.0", from_currency, to_currency)
-        return 1.0
+        rate = yf.Ticker(pair, session=yf_session).history(period="1d")["Close"].iloc[-1]
+        return float(rate), True
+    except Exception as exc:
+        _log.warning("FX rate fetch failed for %s→%s: %s — using 1.0 fallback", from_currency, to_currency, exc)
+        return 1.0, False
 
 
 @cached(long_cache)
@@ -60,9 +63,10 @@ def get_historical_fx_rate(from_currency: str, to_currency: str, date_str: str) 
     try:
         end = str((pd.Timestamp(date_str) + pd.DateOffset(days=7)).date())
         pair = f"{from_currency}{to_currency}=X"
-        hist = yf.Ticker(pair).history(start=date_str, end=end)
+        hist = yf.Ticker(pair, session=yf_session).history(start=date_str, end=end)
         if not hist.empty:
             return float(hist["Close"].iloc[0])
     except Exception:
         _log.warning("Historical FX lookup failed for %s→%s on %s; falling back to live rate", from_currency, to_currency, date_str)
-    return get_fx_rate(from_currency, to_currency)
+    rate, _ = get_fx_rate(from_currency, to_currency)
+    return rate
