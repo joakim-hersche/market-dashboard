@@ -78,11 +78,15 @@ def build_sidebar(
             all_tickers.update({t: t for t in opts})
 
     # ── Unified Search Bar ─────────────────────────────────
+    ui.html(
+        f'<div style="font-size:9px;font-weight:600;color:{TEXT_DIM};letter-spacing:0.04em;'
+        f'text-transform:uppercase;margin-bottom:2px;">Add Position</div>'
+    )
     search_select = ui.select(
         options=all_tickers,
         with_input=True,
         label="Search ticker...",
-    ).props("dense outlined use-input clearable").classes("w-full sidebar-search").style(
+    ).props('dense outlined use-input clearable input-debounce="150"').classes("w-full sidebar-search").style(
         f"font-size:11px;"
     )
 
