@@ -534,11 +534,16 @@ body, .q-page, .nicegui-content {
   .q-header { padding-top: env(safe-area-inset-top); }
 }
 
-/* Sidebar search — center placeholder and input text */
+/* Sidebar search — vertically center input text */
+.sidebar-search .q-field__control {
+    min-height: 36px !important;
+    height: 36px !important;
+}
 .sidebar-search .q-field__native,
-.sidebar-search .q-field__input,
-.sidebar-search .q-field__label {
-    text-align: center !important;
+.sidebar-search .q-field__input {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 36px !important;
 }
 
 /* Reserve space for Plotly charts to prevent scroll jumps */
