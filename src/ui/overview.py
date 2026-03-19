@@ -146,9 +146,11 @@ async def build_overview_tab(
     val_int = f"{currency_symbol}{int(total_value):,}"
     val_dec = f"{total_value:.2f}".split('.')[-1]
     card_1 = _kpi_card(
-        "Total Portfolio Value", val_int, C_CARD_BRD,
-        line1=f'<div style="font-size:16px;font-weight:700;color:{TEXT_PRIMARY};margin-top:1px;">.{val_dec}</div>',
-        line2=f'<div class="kpi-sub" style="color:{TEXT_DIM};">Updated {cache_time} \u00b7 15 min cache</div>',
+        "Total Portfolio Value",
+        f'{val_int}<span style="font-size:16px;font-weight:700;">.{val_dec}</span>',
+        C_CARD_BRD,
+        line1=f'<div class="kpi-sub" style="color:{TEXT_DIM};">Updated {cache_time} \u00b7 15 min cache</div>',
+        line2='',
         hero=True,
     )
     card_2 = _kpi_card(
