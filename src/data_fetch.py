@@ -88,6 +88,12 @@ def fetch_fundamentals(ticker: str) -> dict:
         if current and low_1y and high_1y and high_1y > low_1y:
             position = round((current - low_1y) / (high_1y - low_1y) * 100, 1)
 
+        # Analyst consensus target price
+        target_price = info.get("targetMeanPrice")
+        if target_price and ticker_ccy == "GBX":
+            target_price = target_price / 100  # convert GBX to GBP
+        sector = info.get("sector")
+
         return {
             "P/E Ratio":      round(pe, 1)        if pe      else None,
             "Div Yield (%)":  round(div_pct, 2)   if div_pct else None,
@@ -95,6 +101,9 @@ def fetch_fundamentals(ticker: str) -> dict:
             "1-Year High":    round(high_1y, 2)    if high_1y else None,
             "1-Year Position": position,
             "Current Price":  round(current, 2)    if current else None,
+            "Target Price":   round(target_price, 2) if target_price else None,
+            "Sector":         sector,
+            "Dividend Rate":  round(div_rate, 4)   if div_rate else None,
         }
     except Exception:
         return {}
