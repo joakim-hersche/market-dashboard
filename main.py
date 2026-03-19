@@ -322,9 +322,10 @@ async def index(request: Request):
 
         # Tab bar
         tab_map: dict[str, ui.tab] = {}
-        with ui.tabs().classes("w-full") as tabs:
-            for name in _TAB_NAMES:
-                tab_map[name] = ui.tab(name)
+        with ui.element("div").classes("tab-bar-wrapper"):
+            with ui.tabs().classes("w-full") as tabs:
+                for name in _TAB_NAMES:
+                    tab_map[name] = ui.tab(name)
 
         initial_tab = tab_map.get(initial_tab_name, tab_map["Overview"])
 

@@ -379,6 +379,22 @@ body, .q-page, .nicegui-content {
   .metric-grid-3 { grid-template-columns: 1fr; }
   .preview-grid { grid-template-columns: 1fr; }
   .diag-row > * { min-width: 0; flex-basis: 100%%; }
+
+  .tab-bar-wrapper {
+    position: relative;
+    width: 100%%;
+  }
+  .tab-bar-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, %(BG_MAIN)s);
+    pointer-events: none;
+    z-index: 1;
+  }
 }
 
 /* ── Responsive: Small mobile (< 480px) ───────────────── */
