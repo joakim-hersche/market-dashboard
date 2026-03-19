@@ -514,7 +514,7 @@ def _render_flat_table(
             current = f_data.get("Current Price")
 
             if position is not None:
-                position = min(position, 100.0)
+                position = max(5.0, min(position, 95.0))
 
             # 52-week range bar (compact)
             if low is not None and high is not None and position is not None:
