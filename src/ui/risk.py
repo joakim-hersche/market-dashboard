@@ -746,6 +746,38 @@ _SECTOR_COLORS = [
 ]
 
 
+def _build_sector_data(
+    fund_rows: list[dict],
+    portfolio_df: pd.DataFrame,
+) -> tuple[dict[str, str], dict[str, float], list[str], dict[str, float], dict[str, str]]:
+    """Build sector grouping data shared by sector breakdown and rebalancing cards.
+
+    Returns (ticker_sector, ticker_weights, sector_order, sector_totals, sector_color_map).
+    """
+    ticker_sector: dict[str, str] = {
+        r["Ticker"]: r.get("Sector", "Unknown") for r in fund_rows
+    }
+    ticker_weights = portfolio_df.groupby("Ticker")["Weight (%)"].sum().to_dict()
+
+    sector_order: list[str] = []
+    for ticker, _w in sorted(ticker_weights.items(), key=lambda x: x[1], reverse=True):
+        sector = ticker_sector.get(ticker, "Unknown")
+        if sector not in sector_order:
+            sector_order.append(sector)
+
+    sector_totals: dict[str, float] = {}
+    for ticker, weight in ticker_weights.items():
+        sector = ticker_sector.get(ticker, "Unknown")
+        sector_totals[sector] = sector_totals.get(sector, 0) + weight
+
+    sector_order.sort(key=lambda s: sector_totals.get(s, 0), reverse=True)
+    sector_color_map = {
+        s: _SECTOR_COLORS[i % len(_SECTOR_COLORS)]
+        for i, s in enumerate(sector_order)
+    }
+    return ticker_sector, ticker_weights, sector_order, sector_totals, sector_color_map
+
+
 def _render_sector_breakdown(
     fund_rows: list[dict],
     portfolio_df: pd.DataFrame,
@@ -769,34 +801,17 @@ def _render_sector_breakdown(
             ui.html(f'<p style="color:{TEXT_DIM};font-size:12px;">No sector data available.</p>')
             return
 
-        ticker_sector: dict[str, str] = {
-            r["Ticker"]: r.get("Sector", "Unknown") for r in fund_rows
-        }
-        ticker_weights = portfolio_df.groupby("Ticker")["Weight (%)"].sum().to_dict()
+        ticker_sector, ticker_weights, sector_order, sector_totals, sector_color_map = (
+            _build_sector_data(fund_rows, portfolio_df)
+        )
 
-        # Build sector ordering and color mapping
-        sector_order: list[str] = []
-        for ticker, weight in sorted(ticker_weights.items(), key=lambda x: x[1], reverse=True):
-            sector = ticker_sector.get(ticker, "Unknown")
-            if sector not in sector_order:
-                sector_order.append(sector)
-
-        sector_color_map = {s: _SECTOR_COLORS[i % len(_SECTOR_COLORS)] for i, s in enumerate(sector_order)}
-
-        # Aggregate sector totals
-        sector_totals: dict[str, float] = {}
+        # Build per-sector ticker lists for display
         sector_tickers: dict[str, list[tuple[str, float]]] = {}
         for ticker, weight in ticker_weights.items():
             sector = ticker_sector.get(ticker, "Unknown")
-            sector_totals[sector] = sector_totals.get(sector, 0) + weight
             sector_tickers.setdefault(sector, []).append((ticker, round(weight, 2)))
-
-        # Sort tickers within each sector by weight descending
         for sector in sector_tickers:
             sector_tickers[sector].sort(key=lambda x: x[1], reverse=True)
-
-        # Re-sort sectors by total weight descending
-        sector_order.sort(key=lambda s: sector_totals.get(s, 0), reverse=True)
 
         max_sector = max(sector_totals.values()) if sector_totals else 1
         max_ticker = max(ticker_weights.values()) if ticker_weights else 1
@@ -894,31 +909,18 @@ def _render_rebalancing_calculator(
             .reset_index()
         )
 
-        # ── Sector grouping (matches sector breakdown card ordering) ──
-        ticker_sector: dict[str, str] = {
-            r["Ticker"]: r.get("Sector", "Unknown") for r in fund_rows
-        }
-        ticker_weights_map = portfolio_df.groupby("Ticker")["Weight (%)"].sum().to_dict()
-
-        sector_order: list[str] = []
-        for ticker, _w in sorted(ticker_weights_map.items(), key=lambda x: x[1], reverse=True):
-            sector = ticker_sector.get(ticker, "Unknown")
-            if sector not in sector_order:
-                sector_order.append(sector)
-
-        sector_totals: dict[str, float] = {}
+        # ── Sector grouping (shared helper ensures colors match sector breakdown) ──
+        ticker_sector, ticker_weights_map, sector_order, sector_totals, sector_color_map = (
+            _build_sector_data(fund_rows, portfolio_df)
+        )
         sector_tickers_grouped: dict[str, list[str]] = {}
-        for ticker, weight in ticker_weights_map.items():
+        for ticker in ticker_weights_map:
             sector = ticker_sector.get(ticker, "Unknown")
-            sector_totals[sector] = sector_totals.get(sector, 0) + weight
             sector_tickers_grouped.setdefault(sector, []).append(ticker)
-
         for sector in sector_tickers_grouped:
             sector_tickers_grouped[sector].sort(
                 key=lambda t: ticker_weights_map.get(t, 0), reverse=True,
             )
-        sector_order.sort(key=lambda s: sector_totals.get(s, 0), reverse=True)
-        sector_color_map = {s: _SECTOR_COLORS[i % len(_SECTOR_COLORS)] for i, s in enumerate(sector_order)}
 
         target_weights: dict[str, float] = {
             row["Ticker"]: round(row["Weight (%)"], 2)
