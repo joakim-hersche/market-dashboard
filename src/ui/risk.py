@@ -653,9 +653,9 @@ def _corr_color(val: float) -> str:
 def _render_correlation_heatmap(price_data: dict, tickers: list) -> None:
     """Render the pairwise correlation matrix as an HTML CSS grid."""
     with ui.column().classes("chart-card w-full"):
+        ui.html('<div class="section-label">Correlation Matrix</div>')
         ui.html(
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:{TEXT_MUTED};">Correlation Matrix</div>'
             f'<div style="font-size:10px;color:{TEXT_DIM};">12-month rolling</div>'
             f'</div>'
         )
@@ -785,10 +785,9 @@ def _render_sector_breakdown(
 ) -> None:
     """Sector exposure as grouped horizontal bars."""
     with ui.column().classes("chart-card w-full"):
+        ui.html('<div class="section-label">Sector Exposure</div>')
         ui.html(
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<span style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
-            f'text-transform:uppercase;color:{TEXT_MUTED};">Sector Exposure</span>'
             f'<div style="font-size:10px;color:{TEXT_DIM};">by portfolio weight</div>'
             f'</div>'
         )
@@ -888,10 +887,9 @@ def _render_rebalancing_calculator(
 ) -> None:
     """Buy-only rebalancing calculator with sector-grouped drift-bar layout."""
     with ui.column().classes("chart-card card-tertiary w-full").style("gap:0;"):
+        ui.html('<div class="section-label">Rebalancing Calculator</div>')
         ui.html(
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<span style="font-size:10px;font-weight:700;letter-spacing:0.12em;'
-            f'text-transform:uppercase;color:{TEXT_MUTED};">Rebalancing Calculator</span>'
             f'<div style="font-size:10px;color:{TEXT_DIM};">buy-only</div>'
             f'</div>'
         )
@@ -1276,7 +1274,7 @@ async def build_risk_tab(portfolio: dict, currency: str) -> None:
             )
 
         ui.html(
-            '<div class="kpi-row" style="grid-template-columns:1fr 1fr 1fr 1fr;">'
+            '<div class="kpi-row risk-hero" style="grid-template-columns:1fr 1fr 1fr 1fr;">'
             + _risk_kpi("Portfolio Volatility",
                         f"{p_vol:.1f}%" if p_vol is not None else "\u2014",
                         "How much your portfolio swings in a typical year")
@@ -1292,17 +1290,19 @@ async def build_risk_tab(portfolio: dict, currency: str) -> None:
             + '</div>'
         ).classes("w-full")
 
-    # ── Analytics table (full width) ───────────────────────
-    _render_flat_table(
-        portfolio_df, analytics_df, fund_rows, price_data_1y,
-        currency_symbol, portfolio_color_map, base_currency=currency,
-    )
+    # ── Sections with vertical spacing ─────────────────────
+    with ui.element("div").classes("risk-sections w-full"):
+        # Analytics table (full width)
+        _render_flat_table(
+            portfolio_df, analytics_df, fund_rows, price_data_1y,
+            currency_symbol, portfolio_color_map, base_currency=currency,
+        )
 
-    # ── Correlation + Sector + Rebalancing — three wide ─────
-    with ui.element("div").classes("risk-triple w-full"):
-        if has_corr:
-            _render_correlation_heatmap(price_data_1y, tickers)
-        else:
-            ui.element("div")  # placeholder to keep 3-col grid
-        _render_sector_breakdown(fund_rows, portfolio_df, portfolio_color_map)
-        _render_rebalancing_calculator(fund_rows, portfolio_df, currency_symbol)
+        # Correlation + Sector + Rebalancing — three wide
+        with ui.element("div").classes("risk-triple w-full"):
+            if has_corr:
+                _render_correlation_heatmap(price_data_1y, tickers)
+            else:
+                ui.element("div")
+            _render_sector_breakdown(fund_rows, portfolio_df, portfolio_color_map)
+            _render_rebalancing_calculator(fund_rows, portfolio_df, currency_symbol)
