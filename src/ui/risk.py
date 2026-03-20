@@ -34,6 +34,7 @@ from src.theme import (
     TEXT_SECONDARY,
     BG_PILL,
     BORDER,
+    BORDER_INPUT,
     BORDER_SUBTLE,
     BG_TOPBAR,
     GREEN,
@@ -1044,8 +1045,8 @@ def _render_rebalancing_calculator(
 
         # ── Deposit input ──
         input_style = (
-            f"background:{BG_PILL};border:1px solid {BORDER_SUBTLE};"
-            f"border-radius:6px;padding:0 4px;"
+            f"background:{BG_PILL};border:1px solid {BORDER_INPUT};"
+            f"border-radius:4px;padding:0 4px;"
         )
         with ui.row().classes("w-full items-center").style("gap:8px;margin-bottom:10px;"):
             ui.html(
