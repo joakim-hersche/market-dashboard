@@ -678,8 +678,7 @@ body, .q-page, .nicegui-content {
 
 /* ── Tertiary card (rebalancing calculator) ── */
 .card-tertiary {
-    background: %(BG_PAGE)s !important;
-    border-top: 1px solid %(BORDER)s;
+    border-top: 2px solid %(BORDER)s;
 }
 </style>
 """ % {
