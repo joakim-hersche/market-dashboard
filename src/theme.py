@@ -559,15 +559,9 @@ body, .q-page, .nicegui-content {
     background: rgba(255,255,255,0.015);
 }
 
-/* ── Plotly modebar ── */
+/* ── Plotly modebar — hidden for clean minimal look ── */
 .js-plotly-plot .modebar {
-    background: transparent !important;
-}
-.js-plotly-plot .modebar-btn path {
-    fill: %(TEXT_DIM)s !important;
-}
-.js-plotly-plot .modebar-btn:hover path {
-    fill: %(TEXT_MUTED)s !important;
+    display: none !important;
 }
 
 /* ── PWA standalone mode: hide browser chrome padding ─── */
