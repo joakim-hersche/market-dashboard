@@ -248,12 +248,12 @@ def _build_positions_table(
             is_unavailable = clean_ticker in _unavailable
             if is_unavailable:
                 company_cell = (
-                    f'<td style="{row_style}">{company} '
+                    f'<td style="{row_style}font-size:11px;color:{TEXT_MUTED};">{company} '
                     f'<span class="kpi-badge badge-amber" style="font-size:10px;">'
                     f'\u26a0 Data unavailable</span></td>'
                 )
             else:
-                company_cell = f'<td style="{row_style}">{company}</td>'
+                company_cell = f'<td style="{row_style}font-size:11px;color:{TEXT_MUTED};">{company}</td>'
 
             cells = [
                 ticker_cell,

@@ -193,6 +193,36 @@ body, .q-page, .nicegui-content {
 .badge-red   { background: %(RED_BG)s; color: %(RED)s; }
 .badge-amber { background: %(AMBER_BG)s; color: %(AMBER)s; }
 
+/* ── Risk tab hero KPIs ── */
+.risk-hero .kpi-value {
+    font-size: 24px;
+}
+.risk-hero .kpi-card {
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+/* ── Section spacing for Risk tab ── */
+.risk-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%%;
+}
+.risk-sections .risk-triple {
+    gap: 12px;
+}
+
+/* ── Section labels ── */
+.section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: %(TEXT_DIM)s;
+    margin-bottom: 8px;
+}
+
 /* ── Chart cards ───────────────────────────────────────── */
 .chart-card {
   background: %(BG_CARD)s; border: 1px solid %(BORDER)s;
@@ -230,15 +260,20 @@ body, .q-page, .nicegui-content {
 .table-wrap table { width: 100%%; border-collapse: collapse; font-size: 12px; }
 .table-wrap thead tr { background: %(BG_TOPBAR)s; border-bottom: 1px solid %(BORDER)s; }
 .table-wrap thead th {
-  padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase; color: %(TEXT_FAINT)s;
+  padding: 10px 12px; text-align: left;
+  color: %(TEXT_DIM)s !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .table-wrap tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
 .table-wrap tbody tr:last-child { border-bottom: none; }
-.table-wrap tbody tr:hover { background: rgba(255,255,255,0.03); }
+.table-wrap tbody tr:hover { background: rgba(59,130,246,0.06) !important; }
 .table-wrap tbody td { padding: 9px 12px; color: %(TEXT_SECONDARY)s; }
-.table-wrap tbody td.td-pos { color: %(GREEN)s; font-weight: 600; }
-.table-wrap tbody td.td-neg { color: %(RED)s; font-weight: 600; }
+.table-wrap tbody td.td-pos { color: %(GREEN)s; font-weight: 600; background: rgba(22,163,74,0.06); }
+.table-wrap tbody td.td-neg { color: %(RED)s; font-weight: 600; background: rgba(220,38,38,0.06); }
 .table-wrap tbody td.td-amb { color: %(AMBER)s; font-weight: 600; }
 .td-ticker { font-weight: 700; color: %(TEXT_PRIMARY)s; display: flex; align-items: center; gap: 6px; }
 .hm-cell { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.85); }
