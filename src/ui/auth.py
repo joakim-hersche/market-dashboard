@@ -73,11 +73,11 @@ def _build_login_form(container, on_login_success: callable):
             )
 
             with ui.row().classes("w-full justify-between").style("margin-top:16px;"):
-                ui.link("Create account", "").style(
-                    f"font-size:12px; color:{ACCENT}; cursor:pointer;"
+                ui.label("Create account").style(
+                    f"font-size:12px; color:{ACCENT}; cursor:pointer; text-decoration:underline;"
                 ).on("click", lambda: _swap_to_register(container, on_login_success))
-                ui.link("Forgot password?", "").style(
-                    f"font-size:12px; color:{TEXT_DIM}; cursor:pointer;"
+                ui.label("Forgot password?").style(
+                    f"font-size:12px; color:{TEXT_DIM}; cursor:pointer; text-decoration:underline;"
                 ).on("click", lambda: _swap_to_reset_request(container, on_login_success))
 
 
@@ -133,8 +133,8 @@ def _build_register_form(container, on_login_success: callable):
                 f"width:100%; margin-top:16px; background:{ACCENT}; border-radius:8px;"
             )
 
-            ui.link("Already have an account?", "").style(
-                f"font-size:12px; color:{ACCENT}; cursor:pointer; margin-top:12px;"
+            ui.label("Already have an account?").style(
+                f"font-size:12px; color:{ACCENT}; cursor:pointer; text-decoration:underline; margin-top:12px;"
             ).on("click", lambda: _swap_to_login(container, on_login_success))
 
 
@@ -244,8 +244,8 @@ def _build_reset_request_form(container, on_login_success: callable):
                 f"width:100%; margin-top:16px; background:{ACCENT}; border-radius:8px;"
             )
 
-            ui.link("Back to sign in", "").style(
-                f"font-size:12px; color:{ACCENT}; cursor:pointer; margin-top:12px;"
+            ui.label("Back to sign in").style(
+                f"font-size:12px; color:{ACCENT}; cursor:pointer; text-decoration:underline; margin-top:12px;"
             ).on("click", lambda: _swap_to_login(container, on_login_success))
 
 
@@ -295,7 +295,7 @@ async def _send_verify_email(email: str, code: str) -> None:
     """Send verification code email via Resend."""
     import os
     api_key = os.environ.get("RESEND_API_KEY")
-    from_email = os.environ.get("FROM_EMAIL", "noreply@example.com")
+    from_email = os.environ.get("FROM_EMAIL", "noreply@fxportfolio.app")
     if not api_key:
         _log.warning("RESEND_API_KEY not set — skipping verification email to %s (code: %s)", email, code)
         return
@@ -320,8 +320,8 @@ async def _send_reset_email(email: str, token: str) -> None:
     """Send password reset email via Resend."""
     import os
     api_key = os.environ.get("RESEND_API_KEY")
-    from_email = os.environ.get("FROM_EMAIL", "noreply@example.com")
-    host = os.environ.get("APP_URL", "http://localhost:8080")
+    from_email = os.environ.get("FROM_EMAIL", "noreply@fxportfolio.app")
+    host = os.environ.get("APP_URL", "https://fxportfolio.app")
     if not api_key:
         _log.warning("RESEND_API_KEY not set — skipping reset email to %s", email)
         return
