@@ -426,9 +426,6 @@ body, .q-page, .nicegui-content {
 
   /* ── Mobile sidebar: three-zone flex layout ── */
   .q-drawer { width: 100vw !important; max-width: 100vw !important; }
-  /* Fix: Quasar translates by -220px (prop width), but CSS makes it 100vw.
-     Force fully off-screen when closed so it doesn't peek. */
-  .q-drawer--left:not(.q-drawer--opened) { transform: translateX(-100vw) !important; }
   .q-drawer__content {
     display: flex !important;
     flex-direction: column !important;
