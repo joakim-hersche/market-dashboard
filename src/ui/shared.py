@@ -105,6 +105,8 @@ def save_portfolio(data: dict) -> None:
 
 def _make_user_fernet(encryption_key: bytes) -> Fernet:
     """Build a Fernet cipher from a raw 32-byte per-user key."""
+    if len(encryption_key) != 32:
+        raise ValueError(f"encryption_key must be 32 bytes, got {len(encryption_key)}")
     return Fernet(base64.urlsafe_b64encode(encryption_key))
 
 
@@ -115,11 +117,15 @@ def _server_load(encryption_key: bytes, user_id: str) -> dict:
     if not row:
         return {}
     f = _make_user_fernet(encryption_key)
-    decrypted = f.decrypt(
-        row["data"] if isinstance(row["data"], bytes) else row["data"].encode()
-    )
-    parsed = json.loads(decrypted)
-    return parsed if isinstance(parsed, dict) else {}
+    try:
+        decrypted = f.decrypt(
+            row["data"] if isinstance(row["data"], bytes) else row["data"].encode()
+        )
+        parsed = json.loads(decrypted)
+        return parsed if isinstance(parsed, dict) else {}
+    except (InvalidToken, Exception):
+        _log.exception("Failed to decrypt server portfolio for user %s", user_id)
+        return {}
 
 
 def _server_save(data: dict, encryption_key: bytes, user_id: str) -> None:
