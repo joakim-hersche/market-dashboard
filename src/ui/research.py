@@ -322,7 +322,7 @@ async def _render_portfolio_fit(
 
     with ui.column().style(
         f"background:{BG_PILL};border:1px solid {BORDER_SUBTLE};"
-        f"border-radius:8px;padding:16px 18px;width:100%;"
+        f"border-radius:8px;padding:16px 18px;width:100%;flex:1;"
     ):
         ui.label("Portfolio Fit Preview").style(
             f"font-size:10px;font-weight:700;letter-spacing:0.12em;"
@@ -652,7 +652,7 @@ async def build_research_tab(
         recent_list.insert(0, ticker)
         recent_list = recent_list[:10]
         app.storage.user["recent_searches"] = recent_list
-        _refresh_recent()
+        _refresh_recent.refresh()
 
         # Show loading
         results_container.clear()
@@ -722,10 +722,10 @@ async def build_research_tab(
             )
 
             # Two-column layout: fundamentals + portfolio fit
-            with ui.element("div").classes("charts-row"):
+            with ui.element("div").classes("charts-row").style("align-items:stretch;"):
                 with ui.column().style("gap:var(--grid-gap);"):
                     _render_fundamentals(fund, extra_info, currency_symbol, medians)
-                with ui.column().style("gap:var(--grid-gap);"):
+                with ui.column().style("gap:var(--grid-gap);justify-content:stretch;"):
                     await _render_portfolio_fit(
                         ticker, fund, extra_info, portfolio, currency
                     )
