@@ -154,37 +154,37 @@ def _render_health_score(score_result: dict) -> None:
     with ui.expansion("How is this calculated?").classes("w-full").style(
         "margin-bottom:16px;"
     ):
+        descriptions = {
+            "Diversification": {
+                "what": "How many distinct sectors and geographies your portfolio spans.",
+                "why": "Portfolios spread across more sectors and countries are less exposed to any single downturn.",
+            },
+            "Concentration": {
+                "what": "How evenly your capital is distributed across holdings.",
+                "why": "High concentration means a large drop in one or two stocks can significantly impact your total portfolio.",
+            },
+            "Correlation": {
+                "what": "How independently your holdings move from each other.",
+                "why": "If all your stocks rise and fall together, diversification is an illusion.",
+            },
+            "Stability": {
+                "what": "How much your portfolio value swings day-to-day.",
+                "why": "Lower volatility means fewer large swings — easier to hold through downturns.",
+            },
+        }
+
+        cards_html = ""
         for comp in components:
             name = comp["name"]
             score = comp["score"]
             max_s = comp["max_score"]
             c = _score_color(score, max_s)
             pct = score / max_s * 100 if max_s > 0 else 0
-
-            # Component descriptions
-            descriptions = {
-                "Diversification": {
-                    "what": "How many distinct sectors and geographies your portfolio spans.",
-                    "why": "Portfolios spread across more sectors and countries are less exposed to any single downturn.",
-                },
-                "Concentration": {
-                    "what": "How evenly your capital is distributed across holdings.",
-                    "why": "High concentration means a large drop in one or two stocks can significantly impact your total portfolio.",
-                },
-                "Correlation": {
-                    "what": "How independently your holdings move from each other.",
-                    "why": "If all your stocks rise and fall together, diversification is an illusion.",
-                },
-                "Stability": {
-                    "what": "How much your portfolio value swings day-to-day.",
-                    "why": "Lower volatility means fewer large swings — easier to hold through downturns.",
-                },
-            }
             desc = descriptions.get(name, {"what": "", "why": ""})
 
-            ui.html(
+            cards_html += (
                 f'<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);'
-                f'border-radius:8px;padding:12px;margin-bottom:8px;">'
+                f'border-radius:8px;padding:12px;display:flex;flex-direction:column;">'
                 f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
                 f'<div><span style="font-weight:600;color:#F1F5F9;">{name}</span>'
                 f'<span style="color:#64748B;font-size:12px;margin-left:8px;">{max_s}% of score</span></div>'
@@ -192,11 +192,16 @@ def _render_health_score(score_result: dict) -> None:
                 f'<span style="font-size:11px;font-weight:400;color:#64748B;"> / {max_s}</span></div></div>'
                 f'<div style="height:6px;background:rgba(255,255,255,0.05);border-radius:3px;margin-bottom:8px;">'
                 f'<div style="height:100%;width:{pct:.0f}%;background:{c};border-radius:3px;"></div></div>'
-                f'<div style="color:#94A3B8;font-size:12px;line-height:1.5;">'
+                f'<div style="color:#94A3B8;font-size:12px;line-height:1.5;flex:1;">'
                 f'<strong style="color:#F1F5F9;">What it measures:</strong> {desc["what"]}<br>'
                 f'<strong style="color:#F1F5F9;">Why it matters:</strong> {desc["why"]}'
                 f'</div></div>'
             )
+
+        ui.html(
+            f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+            f'{cards_html}</div>'
+        )
 
 
 # ── Findings ─────────────────────────────────────────────────────────────────
