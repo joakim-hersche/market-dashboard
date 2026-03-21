@@ -267,7 +267,7 @@ async def build_overview_tab(
     ret_color_m = "#16A34A" if total_return >= 0 else "#DC2626"
     pnl_bg_m = "rgba(22,163,74,0.15)" if daily_pnl >= 0 else "rgba(220,38,38,0.15)"
 
-    ui.html(f'''<div class="mobile-only" style="margin-bottom:16px;">
+    ui.html(f'''<div style="margin-bottom:16px;">
   <div style="background:{BG_CARD};border-radius:10px;padding:16px;
     border:1px solid {BORDER};">
     <div style="font-size:10px;color:{TEXT_MUTED};text-transform:uppercase;
@@ -304,7 +304,7 @@ async def build_overview_tab(
     <div style="font-size:10px;color:{TEXT_DIM};">Contributed:
       <span style="color:{TEXT_MUTED};font-weight:500;">{currency_symbol}{total_contributed:,.2f}</span></div>
   </div>
-</div>''').classes("w-full")
+</div>''').classes("w-full mobile-only")
 
     # ── Allocation + Comparison side by side ───────────────
     with ui.element("div").classes("charts-row w-full").style("width:100%;"):
