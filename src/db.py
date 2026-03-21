@@ -164,30 +164,22 @@ def init_schema() -> None:
         """)
 
     # ── Migrations (safe to re-run) ───────────────────────
+    def _migrate(sql: str) -> None:
+        """Run an ALTER TABLE, ignoring if column already exists."""
+        try:
+            _execute(sql)
+        except Exception:
+            _conn.rollback()  # psycopg requires rollback after failed statement
+
     # B2: email alert preferences
-    try:
-        _execute("ALTER TABLE users ADD COLUMN email_alerts %s DEFAULT NULL" %
-                 ("BOOLEAN" if _backend == "postgres" else "INTEGER"))
-    except Exception:
-        pass  # Column already exists
-    try:
-        _execute("ALTER TABLE users ADD COLUMN last_alert_ids TEXT DEFAULT '[]'")
-    except Exception:
-        pass  # Column already exists
+    _migrate("ALTER TABLE users ADD COLUMN email_alerts %s DEFAULT NULL" %
+             ("BOOLEAN" if _backend == "postgres" else "INTEGER"))
+    _migrate("ALTER TABLE users ADD COLUMN last_alert_ids TEXT DEFAULT '[]'")
 
     # C: tier and Stripe billing
-    try:
-        _execute("ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'free'")
-    except Exception:
-        pass
-    try:
-        _execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
-    except Exception:
-        pass
-    try:
-        _execute("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT")
-    except Exception:
-        pass
+    _migrate("ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'free'")
+    _migrate("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+    _migrate("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT")
 
 
 # ── User queries ──────────────────────────────────────────
