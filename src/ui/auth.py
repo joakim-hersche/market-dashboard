@@ -34,9 +34,13 @@ def _build_login_form(container, on_login_success: callable):
             f"width:380px; max-width:90vw; background:{BG_CARD};"
             f" border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:32px;"
         ):
-            ui.label("Sign in").style(
-                f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY}; margin-bottom:20px;"
-            )
+            with ui.row().classes("w-full items-center justify-between").style("margin-bottom:12px;"):
+                ui.label("Sign in").style(
+                    f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY};"
+                )
+                ui.button(icon="close", on_click=lambda: ui.navigate.to("/")).props(
+                    "flat dense round size=sm color=none"
+                ).style(f"color:{TEXT_MUTED}; min-width:32px; min-height:32px;")
             email_input = ui.input("Email").props("outlined dense").style(
                 f"width:100%; background:{BG_INPUT};"
             )
@@ -94,9 +98,13 @@ def _build_register_form(container, on_login_success: callable):
             f"width:380px; max-width:90vw; background:{BG_CARD};"
             f" border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:32px;"
         ):
-            ui.label("Create account").style(
-                f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY}; margin-bottom:20px;"
-            )
+            with ui.row().classes("w-full items-center justify-between").style("margin-bottom:12px;"):
+                ui.label("Create account").style(
+                    f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY};"
+                )
+                ui.button(icon="close", on_click=lambda: ui.navigate.to("/")).props(
+                    "flat dense round size=sm color=none"
+                ).style(f"color:{TEXT_MUTED}; min-width:32px; min-height:32px;")
             email_input = ui.input("Email").props("outlined dense").style(
                 f"width:100%; background:{BG_INPUT};"
             )
@@ -151,9 +159,13 @@ def _build_verify_form(container, user_id: str, email: str, on_login_success: ca
             f"width:380px; max-width:90vw; background:{BG_CARD};"
             f" border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:32px;"
         ):
-            ui.label("Verify your email").style(
-                f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY}; margin-bottom:8px;"
-            )
+            with ui.row().classes("w-full items-center justify-between").style("margin-bottom:4px;"):
+                ui.label("Verify your email").style(
+                    f"font-size:20px; font-weight:700; color:{TEXT_PRIMARY};"
+                )
+                ui.button(icon="close", on_click=lambda: ui.navigate.to("/")).props(
+                    "flat dense round size=sm color=none"
+                ).style(f"color:{TEXT_MUTED}; min-width:32px; min-height:32px;")
             ui.label(f"Enter the 6-digit code sent to {email}").style(
                 f"font-size:13px; color:{TEXT_DIM}; margin-bottom:20px;"
             )
