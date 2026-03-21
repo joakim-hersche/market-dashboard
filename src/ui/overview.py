@@ -258,7 +258,7 @@ async def build_overview_tab(
     ui.html(
         f'<div class="kpi-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">'
         f'{card_1}{card_2}{card_3}{card_4}{card_5}</div>'
-    ).classes("w-full desktop-only")
+    ).classes("w-full not-phone")
 
     # Mobile: consolidated hero card
     sign_pnl_m = "+" if daily_pnl >= 0 else ""
@@ -304,7 +304,7 @@ async def build_overview_tab(
     <div style="font-size:10px;color:{TEXT_DIM};">Contributed:
       <span style="color:{TEXT_MUTED};font-weight:500;">{currency_symbol}{total_contributed:,.2f}</span></div>
   </div>
-</div>''').classes("w-full mobile-only")
+</div>''').classes("w-full touch-only")
 
     # ── Allocation + Comparison side by side ───────────────
     with ui.element("div").classes("charts-row w-full").style("width:100%;"):
