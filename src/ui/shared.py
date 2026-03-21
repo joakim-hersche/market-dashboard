@@ -41,21 +41,29 @@ def get_storage_secret() -> str:
     return _STORAGE_SECRET
 
 
-def load_portfolio() -> dict:
-    """Load and decrypt portfolio from user storage."""
+def _get_session_encryption_key() -> bytes | None:
+    """Retrieve the per-user encryption key from session storage.
+
+    Stored as base64 string (JSON-safe); decoded to bytes here.
+    """
+    b64 = app.storage.user.get("encryption_key")
+    if not b64:
+        return None
+    return base64.urlsafe_b64decode(b64.encode())
+
+
+def _load_local() -> dict:
+    """Load portfolio from local browser storage only (no server routing)."""
     raw = app.storage.user.get(_LS_KEY, {})
-    # Already a dict — unencrypted legacy data; will be encrypted on next save
     if isinstance(raw, dict):
         return raw
     if isinstance(raw, str):
-        # Try decrypting first (encrypted data is a Fernet token string)
         try:
             decrypted = _fernet.decrypt(raw.encode())
             parsed = json.loads(decrypted)
             return parsed if isinstance(parsed, dict) else {}
         except InvalidToken:
             pass
-        # Fallback: legacy unencrypted JSON string
         try:
             parsed = json.loads(raw)
             return parsed if isinstance(parsed, dict) else {}
@@ -64,7 +72,59 @@ def load_portfolio() -> dict:
     return {}
 
 
+def load_portfolio() -> dict:
+    """Load and decrypt portfolio — from server if logged in, else local."""
+    user_id = app.storage.user.get("user_id")
+    encryption_key = _get_session_encryption_key()
+    if user_id and encryption_key:
+        data = _server_load(encryption_key, user_id)
+        # Cache locally for the session
+        if data:
+            app.storage.user[_LS_KEY] = json.dumps(data, default=str)
+        return data
+
+    return _load_local()
+
+
 def save_portfolio(data: dict) -> None:
-    """Encrypt and persist portfolio to user storage."""
+    """Encrypt and persist portfolio — to server if logged in, else local."""
+    user_id = app.storage.user.get("user_id")
+    encryption_key = _get_session_encryption_key()
+    if user_id and encryption_key:
+        _server_save(data, encryption_key, user_id)
+        # Also cache locally
+        app.storage.user[_LS_KEY] = json.dumps(data, default=str)
+        return
+
+    # Anonymous: local-only
     plaintext = json.dumps(data, default=str).encode()
     app.storage.user[_LS_KEY] = _fernet.encrypt(plaintext).decode()
+
+
+# ── Server-side portfolio (logged-in users) ───────────────
+
+def _make_user_fernet(encryption_key: bytes) -> Fernet:
+    """Build a Fernet cipher from a raw 32-byte per-user key."""
+    return Fernet(base64.urlsafe_b64encode(encryption_key))
+
+
+def _server_load(encryption_key: bytes, user_id: str) -> dict:
+    """Load and decrypt portfolio from the database."""
+    from src import db
+    row = db.get_portfolio(user_id)
+    if not row:
+        return {}
+    f = _make_user_fernet(encryption_key)
+    decrypted = f.decrypt(
+        row["data"] if isinstance(row["data"], bytes) else row["data"].encode()
+    )
+    parsed = json.loads(decrypted)
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _server_save(data: dict, encryption_key: bytes, user_id: str) -> None:
+    """Encrypt and upsert portfolio into the database."""
+    from src import db
+    f = _make_user_fernet(encryption_key)
+    plaintext = json.dumps(data, default=str).encode()
+    db.upsert_portfolio(user_id, f.encrypt(plaintext))
