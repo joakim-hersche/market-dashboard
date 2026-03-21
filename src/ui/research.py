@@ -77,7 +77,9 @@ def _flat_tickers(stock_options: dict) -> list[str]:
     """Extract a flat list of tickers from stock_options groups."""
     tickers = []
     for group_tickers in stock_options.values():
-        if isinstance(group_tickers, list):
+        if isinstance(group_tickers, dict):
+            tickers.extend(group_tickers.keys())
+        elif isinstance(group_tickers, list):
             tickers.extend(group_tickers)
     return tickers
 
@@ -731,15 +733,12 @@ async def build_research_tab(
                     )
 
             # Price chart
-            ui.html('<hr class="content-divider">')
             _render_price_chart(ticker, hist)
 
             # Peer comparison
-            ui.html('<hr class="content-divider">')
             await _render_peers(ticker, fund, stock_options, currency_symbol)
 
             # News
-            ui.html('<hr class="content-divider">')
             _render_news(news)
 
     # Search bar
