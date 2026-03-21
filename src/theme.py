@@ -357,9 +357,12 @@ body, .q-page, .nicegui-content {
   .table-wrap table { min-width: 600px; }
 }
 
-/* ── Mobile utility classes ── */
+/* ── Device-tier utility classes ── */
 .mobile-only { display: none !important; }
-.desktop-only { /* visible by default; hidden via media query on mobile */ }
+.desktop-only { /* visible by default; hidden via pointer queries */ }
+.touch-only { display: none !important; }
+.touch-large-only { display: none !important; }
+.not-phone { /* visible by default; hidden on touch-small */ }
 
 /* ── Bottom tab bar (base — hidden on desktop) ── */
 .mobile-tab-bar {
