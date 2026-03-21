@@ -49,6 +49,16 @@ def _apply_default_layout(fig: go.Figure, **overrides) -> go.Figure:
     return fig
 
 
+def is_mobile() -> bool:
+    """Check if current request is from a mobile device (best-effort)."""
+    try:
+        from nicegui import context
+        ua = context.client.request.headers.get("user-agent", "").lower()
+        return any(k in ua for k in ("mobile", "android", "iphone", "ipad"))
+    except Exception:
+        return False
+
+
 def _mobile_overrides(fig: go.Figure) -> go.Figure:
     """Apply mobile-specific layout overrides. Call AFTER chart-specific layout."""
     fig.update_layout(
