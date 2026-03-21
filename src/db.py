@@ -166,10 +166,13 @@ def init_schema() -> None:
     # ── Migrations (safe to re-run) ───────────────────────
     def _migrate(sql: str) -> None:
         """Run an ALTER TABLE, ignoring if column already exists."""
-        try:
-            _execute(sql)
-        except Exception:
-            _conn.rollback()  # psycopg requires rollback after failed statement
+        with _lock:
+            try:
+                cur = _conn.cursor()
+                cur.execute(sql)
+                _conn.commit()
+            except Exception:
+                _conn.rollback()
 
     # B2: email alert preferences
     _migrate("ALTER TABLE users ADD COLUMN email_alerts %s DEFAULT NULL" %
