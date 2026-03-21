@@ -506,10 +506,10 @@ async def build_comparison(
     ]
     earliest_date = min(all_dates) if all_dates else None
 
-    with ui.row().classes("w-full items-start justify-between").style("margin:0;"):
+    with ui.row().classes("w-full items-start justify-between flex-wrap").style("margin:0;gap:8px;"):
         ui.html('<div class="chart-title" style="margin-top:2px;">Portfolio Comparison</div>')
         ui.html(f'<div style="font-size:10px;color:{TEXT_DIM};margin-top:2px;">All positions rebased to 100 at period start</div>')
-        with ui.row().classes("items-center gap-2"):
+        with ui.row().classes("items-center gap-2 flex-wrap"):
             range_toggle = ui.toggle(
                 list(range_options.keys()), value="6M",
             ).props("dense size=sm no-caps").style("font-size:10px;")
@@ -539,9 +539,9 @@ async def build_comparison(
                     "flat dense no-caps"
                 ).style(
                     f"opacity:{opacity};border:1px solid {color}40;border-radius:20px;"
-                    f"padding:2px 10px;font-size:11px;color:#F1F5F9;"
+                    f"padding:6px 12px;font-size:11px;color:#F1F5F9;"
                     f"background:{'rgba(0,0,0,0)' if not active else color + '15'};"
-                    f"transition:all 0.2s ease;min-height:0;line-height:1.4;"
+                    f"transition:all 0.2s ease;min-height:32px;line-height:1.4;"
                 ):
                     ui.html(
                         f'<span style="display:inline-flex;align-items:center;gap:4px;">'
@@ -556,11 +556,11 @@ async def build_comparison(
             )
             ui.button("All", on_click=lambda: _set_all(True)).props(
                 "flat dense no-caps size=xs"
-            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
+            ).style("font-size:10px;color:#94A3B8;min-height:28px;padding:4px 8px;")
             ui.html('<span style="font-size:10px;color:#64748B;">/</span>')
             ui.button("None", on_click=lambda: _set_all(False)).props(
                 "flat dense no-caps size=xs"
-            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
+            ).style("font-size:10px;color:#94A3B8;min-height:28px;padding:4px 8px;")
 
     async def update_chart():
         chart_container.clear()
