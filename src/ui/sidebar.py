@@ -475,11 +475,11 @@ def build_sidebar(
                         f'line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{company_name}">'
                         f'{ticker} <span style="font-weight:400;color:{TEXT_DIM};">{value_text}</span></div>'
                         f'<div onclick="{edit_onclick}" '
-                        f'style="flex-shrink:0;cursor:pointer;color:{TEXT_DIM};font-size:12px;line-height:1;'
-                        f'padding:2px;opacity:0.5;" title="Edit {_t}">\u270e</div>'
+                        f'style="flex-shrink:0;cursor:pointer;color:{TEXT_MUTED};font-size:12px;line-height:1;'
+                        f'padding:2px;" title="Edit {_t}">\u270e</div>'
                         f'<div onclick="document.getElementById(\'{bridge_id}\').dispatchEvent(new Event(\'remove_click\'))" '
-                        f'style="flex-shrink:0;cursor:pointer;color:{TEXT_DIM};font-size:14px;line-height:1;'
-                        f'padding:2px;opacity:0.6;" title="Remove {_t}">&times;</div>'
+                        f'style="flex-shrink:0;cursor:pointer;color:{TEXT_MUTED};font-size:14px;line-height:1;'
+                        f'padding:2px;" title="Remove {_t}">&times;</div>'
                         f'</div>'
                     ).classes("w-full")
         else:
