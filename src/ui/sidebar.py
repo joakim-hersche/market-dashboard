@@ -501,10 +501,10 @@ def build_sidebar(
                             f'style="flex-shrink:0;cursor:pointer;color:{TEXT_MUTED};font-size:14px;line-height:1;'
                             f'padding:2px;" title="Remove {_t}">&times;</div>'
                             f'</div>'
-                        ).classes("w-full desktop-only")
+                        ).classes("w-full not-phone")
 
                         # Mobile: swipe-to-reveal row
-                        with ui.element("q-slide-item").classes("mobile-only w-full") as slide:
+                        with ui.element("q-slide-item").classes("touch-only w-full") as slide:
                             # Left slot — Edit (revealed by swiping right)
                             with slide.add_slot("left"):
                                 ui.html(
@@ -721,7 +721,7 @@ def build_sidebar(
     )
 
     # Desktop: stacked action buttons
-    with ui.column().classes("w-full desktop-only").style("gap:6px;"):
+    with ui.column().classes("w-full not-phone").style("gap:6px;"):
         ui.button(
             "Import Portfolio", icon="upload",
             on_click=lambda: ui.run_javascript(
@@ -743,7 +743,7 @@ def build_sidebar(
         )
 
     # Mobile: compact action grid
-    with ui.element("div").classes("sidebar-action-grid mobile-only"):
+    with ui.element("div").classes("sidebar-action-grid touch-only"):
         ui.button("Import", icon="upload",
             on_click=lambda: ui.run_javascript(
                 f'document.getElementById("c{import_upload.id}").querySelector("input").click()'

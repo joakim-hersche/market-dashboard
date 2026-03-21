@@ -251,7 +251,7 @@ function triggerSwipeHint() {
   if (localStorage.getItem('sidebar_swipe_hint')) return;
   localStorage.setItem('sidebar_swipe_hint', '1');
   setTimeout(function() {
-    var firstSlide = document.querySelector('.mobile-only .q-slide-item .q-slide-item__content');
+    var firstSlide = document.querySelector('.touch-only .q-slide-item .q-slide-item__content');
     if (!firstSlide) return;
     firstSlide.style.transition = 'transform 0.4s ease-out';
     firstSlide.style.transform = 'translateX(-40px)';
@@ -506,7 +506,7 @@ function triggerSwipeHint() {
         _drawer_ref["drawer"] = sidebar_drawer
 
         # ── Zone 1: Fixed top (mobile) — title + close ──
-        with ui.element("div").classes("sidebar-zone-top mobile-only"):
+        with ui.element("div").classes("sidebar-zone-top touch-only"):
             with ui.row().classes("w-full items-center justify-between").style("margin-bottom:10px;"):
                 ui.label("Portfolio").style(
                     f"font-size:15px;font-weight:700;color:{TEXT_PRIMARY};"
@@ -521,7 +521,7 @@ function triggerSwipeHint() {
         build_sidebar(portfolio, stock_options, _shared, _active_tab, on_mutation=_mutation_ref)
 
         # ── Zone 3: Pinned bottom (mobile) — actions + currency ──
-        with ui.element("div").classes("sidebar-zone-bottom mobile-only"):
+        with ui.element("div").classes("sidebar-zone-bottom touch-only"):
             ui.html(
                 f'<div style="font-size:10px;font-weight:700;color:{TEXT_MUTED};'
                 f'letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Currency</div>'
