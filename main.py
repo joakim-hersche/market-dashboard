@@ -555,7 +555,7 @@ function triggerSwipeHint() {
     # ── Sidebar (left drawer) ──────────────────────────────
     with ui.left_drawer(value=True, fixed=True).classes("sidebar").style(
         f"width:220px; background:{BG_SIDEBAR}; border-right:1px solid {BORDER}; padding:16px 12px;"
-    ).props('width=220 :breakpoint="768"') as sidebar_drawer:
+    ).props('width=600 :breakpoint="768"') as sidebar_drawer:
         _drawer_ref["drawer"] = sidebar_drawer
 
         # ── Zone 1: Fixed top (mobile) — title + close ──
@@ -679,8 +679,6 @@ function triggerSwipeHint() {
             ("Overview", "Overview", "grid_view"),
             ("Positions", "Positions", "list"),
             ("Health", "Portfolio Health", "monitor_heart"),
-            ("Income", "Income", "payments"),
-            ("Forecast", "Forecast", "trending_up"),
             ("Research", "Research", "search"),
             ("Guide", "Guide", "menu_book"),
         ]
