@@ -452,9 +452,51 @@ async def build_comparison(
             fx_switch = ui.switch("FX-adjusted", value=False).style(f"font-size:12px;color:{TEXT_MUTED};")
             bench_switch = ui.switch("Show benchmark", value=False).style(f"font-size:12px;color:{TEXT_MUTED};")
 
+    # ── Ticker toggle pills ──
+    ticker_visibility: dict[str, bool] = {t: True for t in portfolio}
+    pill_container = ui.row().classes("w-full items-center gap-1 flex-wrap").style(
+        "overflow-x:auto;padding:4px 0;margin:0;"
+    )
+
     chart_container = ui.column().classes("w-full")
     with chart_container:
         ui.spinner('dots', size='xl').classes('self-center').style('padding:40px 0;')
+
+    def _render_pills():
+        pill_container.clear()
+        with pill_container:
+            for ticker in portfolio:
+                color = portfolio_color_map.get(ticker, "#3B82F6")
+                active = ticker_visibility[ticker]
+                opacity = "1" if active else "0.35"
+                text_style = "text-decoration:line-through;" if not active else ""
+
+                with ui.button(on_click=lambda t=ticker: _toggle_ticker(t)).props(
+                    "flat dense no-caps"
+                ).style(
+                    f"opacity:{opacity};border:1px solid {color}40;border-radius:20px;"
+                    f"padding:2px 10px;font-size:11px;color:#F1F5F9;"
+                    f"background:{'rgba(0,0,0,0)' if not active else color + '15'};"
+                    f"transition:all 0.2s ease;min-height:0;line-height:1.4;"
+                ):
+                    ui.html(
+                        f'<span style="display:inline-flex;align-items:center;gap:4px;">'
+                        f'<span style="width:6px;height:6px;border-radius:50%;background:{color};'
+                        f'display:inline-block;"></span>'
+                        f'<span style="{text_style}">{ticker}</span></span>'
+                    )
+
+            # Select All / None buttons (styled as text links)
+            ui.html(
+                f'<span style="font-size:10px;color:#64748B;margin-left:8px;">|</span>'
+            )
+            ui.button("All", on_click=lambda: _set_all(True)).props(
+                "flat dense no-caps size=xs"
+            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
+            ui.html('<span style="font-size:10px;color:#64748B;">/</span>')
+            ui.button("None", on_click=lambda: _set_all(False)).props(
+                "flat dense no-caps size=xs"
+            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
 
     async def update_chart():
         chart_container.clear()
@@ -550,11 +592,29 @@ async def build_comparison(
                 hovertemplate=f"{bench_name}: %{{y:.1f}}<extra></extra>",
             ))
 
+        # Apply ticker visibility toggles — match by trace name, not index
+        for trace in fig.data:
+            for ticker, visible in ticker_visibility.items():
+                if ticker in trace.name:
+                    trace.visible = True if visible else "legendonly"
+                    break
+
         if chart_height:
             fig.update_layout(height=chart_height)
 
         with chart_container:
             ui.plotly(fig).classes("w-full")
+
+    async def _toggle_ticker(ticker: str):
+        ticker_visibility[ticker] = not ticker_visibility[ticker]
+        _render_pills()
+        await _debounced_update()
+
+    async def _set_all(visible: bool):
+        for t in ticker_visibility:
+            ticker_visibility[t] = visible
+        _render_pills()
+        await _debounced_update()
 
     # Debounce rapid toggles (#27)
     _debounce_timer = {"handle": None}
@@ -568,6 +628,7 @@ async def build_comparison(
     bench_switch.on_value_change(_debounced_update)
 
     # Initial render
+    _render_pills()
     await update_chart()
 
 
