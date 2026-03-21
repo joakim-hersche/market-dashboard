@@ -261,6 +261,9 @@ async def index(request: Request):
     # Mutable ref so sidebar callbacks can read the active tab
     _active_tab = {"name": initial_tab_name}
 
+    # Forward ref for sidebar drawer (assigned after drawer creation)
+    _drawer_ref: dict = {"drawer": None}
+
     # ── Top bar ────────────────────────────────────────────
     with ui.header().classes("items-center justify-between px-5").style(
         f"height: 48px; background: {BG_TOPBAR}; border-bottom: 1px solid {BORDER};"
@@ -269,7 +272,7 @@ async def index(request: Request):
         with ui.row().classes("items-center gap-2"):
             # Hamburger icon (visible only on mobile via CSS)
             ui.button(
-                icon="menu", on_click=lambda: sidebar_drawer.toggle()
+                icon="menu", on_click=lambda: _drawer_ref["drawer"].toggle() if _drawer_ref["drawer"] else None
             ).props("flat dense round size=sm color=none").classes("hamburger-btn").style(
                 f"color:{TEXT_MUTED} !important;min-width:0;width:36px;height:36px;"
             )
@@ -458,6 +461,7 @@ async def index(request: Request):
     with ui.left_drawer(value=True, fixed=True).classes("sidebar").style(
         f"width:220px; background:{BG_SIDEBAR}; border-right:1px solid {BORDER}; padding:16px 12px;"
     ).props('width=220 :breakpoint="768"') as sidebar_drawer:
+        _drawer_ref["drawer"] = sidebar_drawer
         build_sidebar(portfolio, stock_options, _shared, _active_tab, on_mutation=_mutation_ref)
 
         # Mobile-only currency selector in sidebar
