@@ -55,7 +55,7 @@ def build_pricing_page(user_id: str | None, currency: str) -> None:
     with ui.column().classes("w-full items-center").style(
         f"background:{BG_MAIN}; min-height:100vh; padding:40px 20px;"
     ):
-        ui.label("Market Dashboard Pro").style(
+        ui.label("FX Portfolio Pro").style(
             f"font-size:28px; font-weight:700; color:{TEXT_PRIMARY}; margin-bottom:8px;"
         )
         ui.label("Unlock the full power of your portfolio tracker").style(
@@ -69,7 +69,7 @@ def build_pricing_page(user_id: str | None, currency: str) -> None:
 
         def _update_interval(interval: str):
             selected_interval["value"] = interval
-            _refresh_cards()
+            _refresh_cards.refresh()
 
         with interval_row:
             for iv in ["monthly", "yearly", "lifetime"]:
