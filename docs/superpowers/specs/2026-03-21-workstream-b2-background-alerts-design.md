@@ -58,14 +58,14 @@ All database and portfolio operations wrapped in `run.io_bound()` to avoid block
 Two new columns on the `users` table:
 
 ```sql
-ALTER TABLE users ADD COLUMN email_alerts BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN email_alerts BOOLEAN DEFAULT NULL;
 ALTER TABLE users ADD COLUMN last_alert_ids TEXT DEFAULT '[]';
 ```
 
-- `email_alerts`: whether the user has opted in to daily alert emails
+- `email_alerts`: whether the user has opted in to daily alert emails. `NULL` = never asked (show opt-in prompt), `TRUE` = opted in, `FALSE` = explicitly declined.
 - `last_alert_ids`: JSON array of `rule_id` strings from the last email sent (e.g., `["concentration_AAPL", "correlation_MSFT_GOOGL"]`). Used to diff against current alerts — only new ones trigger an email.
 
-**SQLite equivalent:** `email_alerts INTEGER DEFAULT 0`, `last_alert_ids TEXT DEFAULT '[]'`.
+**SQLite equivalent:** `email_alerts INTEGER DEFAULT NULL`, `last_alert_ids TEXT DEFAULT '[]'`.
 
 **Migration:** Add columns via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `init_schema()`. Safe to run repeatedly.
 
