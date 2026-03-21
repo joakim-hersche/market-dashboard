@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 # ── Color tokens (shared across all charts) ──────────────────────────────────
 FALLBACK_COLORS = ["#1D4ED8", "#0EA5E9", "#6366F1", "#10B981", "#F59E0B",
                    "#EC4899", "#8B5CF6", "#06B6D4", "#22C55E", "#F97316"]
+CHART_COLORS = FALLBACK_COLORS  # alias used by sidebar & overview
 
 C_POSITIVE   = "#16A34A"
 C_NEGATIVE   = "#DC2626"
@@ -56,6 +57,34 @@ def _apply_default_layout(fig: go.Figure, **overrides) -> go.Figure:
     )
     fig.update_xaxes(**_axis_style)
     fig.update_yaxes(**_axis_style)
+    return fig
+
+
+def is_mobile() -> bool:
+    """Check if current request is from a mobile device (best-effort)."""
+    try:
+        from nicegui import context
+        ua = context.client.request.headers.get("user-agent", "").lower()
+        return any(k in ua for k in ("mobile", "android", "iphone", "ipad"))
+    except Exception:
+        return False
+
+
+def _mobile_overrides(fig: go.Figure) -> go.Figure:
+    """Apply mobile-specific layout overrides. Call AFTER chart-specific layout."""
+    fig.update_layout(
+        dragmode=False,
+        hovermode="closest",
+        hoverlabel=dict(font=dict(size=10)),
+    )
+    fig.update_xaxes(
+        tickfont=dict(size=9),
+        title=None,
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=9),
+        title=None,
+    )
     return fig
 
 
@@ -243,16 +272,20 @@ def build_comparison_chart(
     fx_adjusted: bool,
     base_currency: str,
     title: str | None = None,
+    mobile: bool = False,
 ) -> go.Figure:
-    # Use "TICKER — Short Name" labels that fit in the legend without overflow
-    def _legend_label(t: str) -> str:
-        name = name_map.get(t, t)
-        if name == t:
-            return t
-        short = name[:15] + "…" if len(name) > 15 else name
-        return f"{t} — {short}"
+    # Mobile: ticker-only labels; Desktop: "TICKER — Short Name"
+    if mobile:
+        comp_label_map = {t: t for t in comparison_df.columns}
+    else:
+        def _legend_label(t: str) -> str:
+            name = name_map.get(t, t)
+            if name == t:
+                return t
+            short = name[:15] + "…" if len(name) > 15 else name
+            return f"{t} — {short}"
+        comp_label_map = {t: _legend_label(t) for t in comparison_df.columns}
 
-    comp_label_map = {t: _legend_label(t) for t in comparison_df.columns}
     color_map = {comp_label_map[t]: portfolio_color_map[t] for t in comparison_df.columns if t in portfolio_color_map}
     display = comparison_df.rename(columns=comp_label_map)
     fx_note = " (FX-adjusted)" if fx_adjusted else ""
@@ -263,27 +296,43 @@ def build_comparison_chart(
     fig.update_traces(
         hovertemplate="<b>%{customdata[0]}</b><br>%{x|%b %d, %Y}<br>Index: %{y:.1f}<extra></extra>",
     )
-    # Attach ticker name as customdata for hover
     for trace in fig.data:
         trace.customdata = [[trace.name]] * len(trace.x)
-    _apply_default_layout(
-        fig,
-        xaxis_title="Date",
-        yaxis_title=f"Indexed (100 = start){fx_note}",
-        legend_title="",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom", y=1.02,
-            xanchor="left", x=0,
-            font=dict(size=10, color=C_NEUTRAL),
-            bgcolor="rgba(0,0,0,0)",
-            bordercolor="rgba(255,255,255,0.06)",
-        ),
-        hovermode="x unified",
-    )
-    fig.update_xaxes(nticks=6)
-    fig.update_yaxes(nticks=6)
-    fig.add_hline(y=100, line_dash="dash", line_color="gray")
+
+    if mobile:
+        _apply_default_layout(
+            fig,
+            legend_title="",
+            legend=dict(
+                orientation="h",
+                yanchor="top", y=-0.15,
+                xanchor="center", x=0.5,
+                font=dict(size=9, color=C_NEUTRAL),
+                bgcolor="rgba(0,0,0,0)",
+                itemclick="toggleothers",
+            ),
+            margin=dict(l=35, r=10, t=10, b=30),
+        )
+        fig.update_xaxes(tickformat="%b", nticks=5)
+        fig.add_hline(y=100, line_dash="dash", line_color="gray")
+        _mobile_overrides(fig)
+    else:
+        _apply_default_layout(
+            fig,
+            xaxis_title="Date",
+            yaxis_title=f"Indexed (100 = start){fx_note}",
+            legend_title="",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", y=1.02,
+                xanchor="left", x=0,
+                font=dict(size=10, color=C_NEUTRAL),
+                bgcolor="rgba(0,0,0,0)",
+                bordercolor="rgba(255,255,255,0.06)",
+            ),
+        )
+        fig.add_hline(y=100, line_dash="dash", line_color="gray")
+
     if title:
         fig.update_layout(
             title=dict(text=title, font=dict(size=12, color="#94A3B8"), x=0, y=0.98),
@@ -302,6 +351,7 @@ def build_price_history_chart(
     effective_from: pd.Timestamp,
     date_to,
     title: str | None = None,
+    mobile: bool = False,
 ) -> go.Figure:
     fig = px.line(x=hist.index, y=hist["Close"], color_discrete_sequence=[line_color])
     fig.update_traces(
@@ -317,23 +367,54 @@ def build_price_history_chart(
         showlegend=False,
         hovermode="x unified",
     )
-    for i, lot in enumerate(lots):
-        if fx_adjusted:
-            buy_price_display = round(lot["buy_price"] * fx_rate, 2)
-            buy_label = f"Buy {i + 1}  {currency_symbol}{buy_price_display}"
-        else:
-            buy_price_display = lot["buy_price"]
-            buy_label = f"Buy {i + 1}  {buy_price_display}"
-        fig.add_hline(
-            y=buy_price_display,
-            line_dash="dash", line_color=C_AMBER,
-            annotation_text=buy_label, annotation_position="top left",
-        )
-        if lot["purchase_date"]:
-            fig.add_vline(
-                x=str(pd.Timestamp(lot["purchase_date"]).date()),
-                line_dash="dash", line_color="gray",
+
+    if mobile:
+        buy_x, buy_y = [], []
+        for lot in lots:
+            if lot.get("purchase_date"):
+                buy_date = pd.Timestamp(lot["purchase_date"])
+                if buy_date in hist.index:
+                    buy_y.append(hist.loc[buy_date, "Close"])
+                    buy_x.append(buy_date)
+                else:
+                    nearest_idx = hist.index.get_indexer([buy_date], method="nearest")[0]
+                    if 0 <= nearest_idx < len(hist):
+                        buy_y.append(hist.iloc[nearest_idx]["Close"])
+                        buy_x.append(hist.index[nearest_idx])
+
+        if buy_x:
+            fig.add_trace(go.Scatter(
+                x=buy_x, y=buy_y,
+                mode="markers",
+                marker=dict(size=8, color="#D97706", line=dict(width=1.5, color="#111318")),
+                name="Buy",
+                showlegend=False,
+                hovertemplate=f"<b>Buy</b><br>%{{x|%b %d, %Y}}<br>{currency_symbol}%{{y:,.2f}}<extra></extra>",
+            ))
+
+        fig.update_layout(margin=dict(l=40, r=10, t=10, b=30), height=200)
+        fig.update_xaxes(nticks=5, tickformat="%b")
+        fig.update_yaxes(nticks=4)
+        _mobile_overrides(fig)
+    else:
+        for i, lot in enumerate(lots):
+            if fx_adjusted:
+                buy_price_display = round(lot["buy_price"] * fx_rate, 2)
+                buy_label = f"Buy {i + 1}  {currency_symbol}{buy_price_display}"
+            else:
+                buy_price_display = lot["buy_price"]
+                buy_label = f"Buy {i + 1}  {buy_price_display}"
+            fig.add_hline(
+                y=buy_price_display,
+                line_dash="dash", line_color=C_AMBER,
+                annotation_text=buy_label, annotation_position="top left",
             )
+            if lot["purchase_date"]:
+                fig.add_vline(
+                    x=str(pd.Timestamp(lot["purchase_date"]).date()),
+                    line_dash="dash", line_color="gray",
+                )
+
     if title:
         fig.update_layout(
             title=dict(text=title, font=dict(size=12, color="#94A3B8"), x=0, y=0.98),

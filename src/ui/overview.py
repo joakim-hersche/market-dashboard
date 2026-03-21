@@ -10,8 +10,8 @@ import pandas as pd
 from nicegui import run, ui
 
 from src.charts import (
-    C_CARD_BRD, C_NEGATIVE, C_POSITIVE,
-    build_comparison_chart,
+    CHART_COLORS, C_CARD_BRD, C_NEGATIVE, C_POSITIVE,
+    build_comparison_chart, is_mobile,
 )
 from src.data_fetch import (
     fetch_company_name, fetch_price_history_range,
@@ -136,6 +136,20 @@ async def build_overview_tab(
         _names = list(_ex.map(lambda t: (t, fetch_company_name(t)), portfolio))
     name_map = dict(_names)
 
+    # ── Alert banner ──────────────────────────────────────
+    from src.ui.alerts import render_alert_banner
+    from src.ui.shared import load_portfolio
+
+    alert_weights = {}
+    for ticker in portfolio:
+        ticker_value = df[df["Ticker"] == ticker]["Total Value"].sum()
+        total_value = df["Total Value"].sum()
+        if total_value > 0:
+            alert_weights[ticker] = ticker_value / total_value
+
+    portfolio_data = load_portfolio()
+    render_alert_banner(portfolio, alert_weights, portfolio_data)
+
     # ── KPI values ─────────────────────────────────────────
     total_value = df["Total Value"].sum()
     daily_pnl = df["Daily P&L"].sum()
@@ -240,10 +254,57 @@ async def build_overview_tab(
         font_size="20px",
     )
 
+    # Desktop: 5-column KPI grid
     ui.html(
         f'<div class="kpi-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr;">'
         f'{card_1}{card_2}{card_3}{card_4}{card_5}</div>'
-    ).classes("w-full")
+    ).classes("w-full not-phone")
+
+    # Mobile: consolidated hero card
+    sign_pnl_m = "+" if daily_pnl >= 0 else ""
+    sign_ret_m = "+" if total_return >= 0 else ""
+    pnl_color_m = "#16A34A" if daily_pnl >= 0 else "#DC2626"
+    ret_color_m = "#16A34A" if total_return >= 0 else "#DC2626"
+    pnl_bg_m = "rgba(22,163,74,0.15)" if daily_pnl >= 0 else "rgba(220,38,38,0.15)"
+
+    ui.html(f'''<div style="margin-bottom:16px;">
+  <div style="background:{BG_CARD};border-radius:10px;padding:16px;
+    border:1px solid {BORDER};">
+    <div style="font-size:10px;color:{TEXT_MUTED};text-transform:uppercase;
+      letter-spacing:0.08em;">Portfolio Value</div>
+    <div style="font-size:28px;font-weight:700;color:{TEXT_PRIMARY};margin-top:4px;">
+      {val_int}<span style="font-size:16px;color:{TEXT_DIM};">.{val_dec}</span></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+      <span style="font-size:12px;color:{pnl_color_m};font-weight:600;">
+        {sign_pnl_m}{currency_symbol}{daily_pnl:,.2f}</span>
+      <span style="font-size:10px;background:{pnl_bg_m};color:{pnl_color_m};
+        padding:2px 6px;border-radius:4px;font-weight:600;">
+        {sign_pnl_m}{daily_pnl_pct:,.2f}%</span>
+      <span style="font-size:10px;color:{TEXT_DIM};">today</span>
+    </div>
+    <div style="border-top:1px solid {BORDER_SUBTLE};margin:12px 0;"></div>
+    <div style="display:flex;justify-content:space-between;">
+      <div>
+        <div style="font-size:9px;color:{TEXT_DIM};text-transform:uppercase;
+          letter-spacing:0.06em;">Total Return</div>
+        <div style="font-size:14px;font-weight:600;color:{ret_color_m};margin-top:2px;">
+          {sign_ret_m}{currency_symbol}{total_return:,.2f}
+          <span style="font-size:10px;opacity:0.7;">
+            {sign_ret_m}{total_ret_pct:,.2f}%</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:9px;color:{TEXT_DIM};text-transform:uppercase;
+          letter-spacing:0.06em;">Positions</div>
+        <div style="font-size:14px;font-weight:600;color:{TEXT_PRIMARY};margin-top:2px;">
+          {n_positions} <span style="font-size:10px;color:{TEXT_DIM};">stocks</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;padding:0 4px;margin-top:8px;">
+    <div style="font-size:10px;color:{TEXT_DIM};">Contributed:
+      <span style="color:{TEXT_MUTED};font-weight:500;">{currency_symbol}{total_contributed:,.2f}</span></div>
+  </div>
+</div>''').classes("w-full touch-only")
 
     # ── Allocation + Comparison side by side ───────────────
     with ui.element("div").classes("charts-row w-full").style("width:100%;"):
@@ -324,56 +385,106 @@ async def build_overview_tab(
         timeline = await run.io_bound(build_contribution_timeline, portfolio, currency)
         if timeline is not None and not timeline.empty:
             import plotly.graph_objects as go
+            from src.charts import _mobile_overrides
+
+            mobile = is_mobile()
+
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=timeline.index, y=timeline["Contributed"],
-                mode="lines", name="Contributed",
+                mode="lines", name="In" if mobile else "Contributed",
                 line=dict(color=TEXT_FAINT, width=1.5, dash="dot"),
                 fill="tozeroy",
                 fillcolor="rgba(132,148,167,0.08)",
             ))
             fig.add_trace(go.Scatter(
                 x=timeline.index, y=timeline["Portfolio Value"],
-                mode="lines", name="Portfolio Value",
+                mode="lines", name="Value" if mobile else "Portfolio Value",
                 line=dict(color=ACCENT, width=2),
                 fill="tonexty",
                 fillcolor="rgba(59,130,246,0.10)",
             ))
-            fig.update_layout(
-                template="plotly",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title="Date"),
-                yaxis=dict(tickprefix=currency_symbol, title=f"Value ({currency})"),
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="left", x=0,
-                    font=dict(size=10, color="#94A3B8"),
-                    bgcolor="rgba(0,0,0,0)",
-                ),
-                margin=dict(l=40, r=20, t=30, b=40),
-                hoverlabel=dict(
-                    bgcolor="#1C1D26", bordercolor="#1E293B",
-                    font=dict(color="#F1F5F9", size=11, family="Inter, sans-serif"),
-                    namelength=-1,
-                ),
-                modebar=dict(
-                    bgcolor="rgba(0,0,0,0)",
-                    color="#64748B",
-                    activecolor="#94A3B8",
-                ),
-            )
-            fig.update_xaxes(gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color="#CBD5E1", size=10), title_font=dict(color="#CBD5E1", size=11))
-            fig.update_yaxes(gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color="#CBD5E1", size=10), title_font=dict(color="#CBD5E1", size=11))
+
+            if mobile:
+                fig.update_layout(
+                    template="plotly",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(
+                        orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="left", x=0,
+                        font=dict(size=9, color="#94A3B8"),
+                        bgcolor="rgba(0,0,0,0)",
+                    ),
+                    margin=dict(l=45, r=10, t=10, b=30),
+                )
+                fig.update_xaxes(
+                    tickformat="%b '%y",
+                    gridcolor="rgba(255,255,255,0.04)",
+                )
+                fig.update_yaxes(
+                    tickprefix=currency_symbol,
+                    tickformat="~s",
+                    gridcolor="rgba(255,255,255,0.04)",
+                )
+                _mobile_overrides(fig)
+                fig.update_layout(height=200)
+            else:
+                fig.update_layout(
+                    template="plotly",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(title="Date"),
+                    yaxis=dict(tickprefix=currency_symbol, title=f"Value ({currency})"),
+                    legend=dict(
+                        orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="left", x=0,
+                        font=dict(size=10, color="#94A3B8"),
+                        bgcolor="rgba(0,0,0,0)",
+                    ),
+                    margin=dict(l=40, r=20, t=30, b=40),
+                    hoverlabel=dict(
+                        bgcolor="#1C1D26", bordercolor="#1E293B",
+                        font=dict(color="#F1F5F9", size=11, family="Inter, sans-serif"),
+                        namelength=-1,
+                    ),
+                    modebar=dict(
+                        bgcolor="rgba(0,0,0,0)",
+                        color="#64748B",
+                        activecolor="#94A3B8",
+                    ),
+                )
+                fig.update_xaxes(gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color="#CBD5E1", size=10), title_font=dict(color="#CBD5E1", size=11))
+                fig.update_yaxes(gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color="#CBD5E1", size=10), title_font=dict(color="#CBD5E1", size=11))
+
             with ui.column().classes("chart-card w-full").style("min-width:0;"):
                 ui.html('<div class="chart-title">Contributions vs. Portfolio Value</div>')
-                ui.html(
-                    f'<p style="font-size:11px;color:{TEXT_DIM};margin:0 0 6px 0;line-height:1.5;">'
-                    "The blue line is what you put in (total money invested). "
-                    "The green line is what it's worth now. "
-                    "The gap between them is your real investment gain or loss."
-                    "</p>"
-                )
+
+                if mobile:
+                    # Inline gain summary instead of paragraph
+                    contributed = timeline["Contributed"].iloc[-1]
+                    value = timeline["Portfolio Value"].iloc[-1]
+                    delta = value - contributed
+                    delta_pct = (delta / contributed * 100) if contributed > 0 else 0
+                    delta_color = "#16A34A" if delta >= 0 else "#DC2626"
+                    sign = "+" if delta >= 0 else ""
+                    if abs(delta) >= 1000:
+                        delta_str = f"{sign}{currency_symbol}{delta/1000:,.1f}K"
+                    else:
+                        delta_str = f"{sign}{currency_symbol}{delta:,.0f}"
+                    ui.html(
+                        f'<div style="font-size:11px;color:{delta_color};font-weight:600;margin-bottom:4px;">'
+                        f'{delta_str} ({sign}{delta_pct:.1f}%)'
+                        f'</div>'
+                    )
+                else:
+                    ui.html(
+                        f'<p style="font-size:11px;color:{TEXT_DIM};margin:0 0 6px 0;line-height:1.5;">'
+                        "The blue line is what you put in (total money invested). "
+                        "The green line is what it's worth now. "
+                        "The gap between them is your real investment gain or loss."
+                        "</p>"
+                    )
                 ui.plotly(fig).classes("w-full")
 
     await _build_contribution_chart()
@@ -405,9 +516,51 @@ async def build_comparison(
             fx_switch = ui.switch("FX-adjusted", value=False).style(f"font-size:12px;color:{TEXT_MUTED};")
             bench_switch = ui.switch("Show benchmark", value=False).style(f"font-size:12px;color:{TEXT_MUTED};")
 
+    # ── Ticker toggle pills ──
+    ticker_visibility: dict[str, bool] = {t: True for t in portfolio}
+    pill_container = ui.row().classes("w-full items-center gap-1 flex-wrap").style(
+        "overflow-x:auto;padding:4px 0;margin:0;"
+    )
+
     chart_container = ui.column().classes("w-full")
     with chart_container:
         ui.spinner('dots', size='xl').classes('self-center').style('padding:40px 0;')
+
+    def _render_pills():
+        pill_container.clear()
+        with pill_container:
+            for ticker in portfolio:
+                color = portfolio_color_map.get(ticker, "#3B82F6")
+                active = ticker_visibility[ticker]
+                opacity = "1" if active else "0.35"
+                text_style = "text-decoration:line-through;" if not active else ""
+
+                with ui.button(on_click=lambda t=ticker: _toggle_ticker(t)).props(
+                    "flat dense no-caps"
+                ).style(
+                    f"opacity:{opacity};border:1px solid {color}40;border-radius:20px;"
+                    f"padding:2px 10px;font-size:11px;color:#F1F5F9;"
+                    f"background:{'rgba(0,0,0,0)' if not active else color + '15'};"
+                    f"transition:all 0.2s ease;min-height:0;line-height:1.4;"
+                ):
+                    ui.html(
+                        f'<span style="display:inline-flex;align-items:center;gap:4px;">'
+                        f'<span style="width:6px;height:6px;border-radius:50%;background:{color};'
+                        f'display:inline-block;"></span>'
+                        f'<span style="{text_style}">{ticker}</span></span>'
+                    )
+
+            # Select All / None buttons (styled as text links)
+            ui.html(
+                f'<span style="font-size:10px;color:#64748B;margin-left:8px;">|</span>'
+            )
+            ui.button("All", on_click=lambda: _set_all(True)).props(
+                "flat dense no-caps size=xs"
+            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
+            ui.html('<span style="font-size:10px;color:#64748B;">/</span>')
+            ui.button("None", on_click=lambda: _set_all(False)).props(
+                "flat dense no-caps size=xs"
+            ).style("font-size:10px;color:#94A3B8;min-height:0;padding:0 4px;")
 
     async def update_chart():
         chart_container.clear()
@@ -457,22 +610,30 @@ async def build_comparison(
                 results = list(ex.map(_fetch_one, portfolio))
             data = {t: series for t, series in results if series is not None}
 
-            # Fetch SPY benchmark if requested
-            spy_series = None
-            if show_bench and "SPY" not in portfolio:
+            # Fetch local market benchmark if requested
+            bench_series = None
+            _BENCH_MAP = {
+                "USD": ("SPY", "S&P 500"),
+                "CHF": ("^SSMI", "SMI"),
+                "EUR": ("^STOXX50E", "Euro Stoxx 50"),
+                "GBP": ("^FTSE", "FTSE 100"),
+                "SEK": ("^OMX", "OMX Stockholm 30"),
+            }
+            bench_ticker, bench_name = _BENCH_MAP.get(base_currency, ("SPY", "S&P 500"))
+            if show_bench and bench_ticker not in portfolio:
                 try:
                     period = selected_range if selected_range != "since" else "max"
-                    spy_hist = fetch_price_history_range("SPY", period)
-                    if selected_range == "since" and earliest_date and not spy_hist.empty:
-                        spy_hist = spy_hist[spy_hist.index >= pd.Timestamp(earliest_date)]
-                    if not spy_hist.empty:
-                        spy_series = spy_hist["Close"]
+                    bench_hist = fetch_price_history_range(bench_ticker, period)
+                    if selected_range == "since" and earliest_date and not bench_hist.empty:
+                        bench_hist = bench_hist[bench_hist.index >= pd.Timestamp(earliest_date)]
+                    if not bench_hist.empty:
+                        bench_series = bench_hist["Close"]
                 except Exception:
                     pass
 
-            return data, spy_series
+            return data, bench_series, bench_name
 
-        comparison_data, spy_series = await run.io_bound(_fetch_comparison_data)
+        comparison_data, bench_series, bench_name = await run.io_bound(_fetch_comparison_data)
 
         comparison_df = pd.DataFrame(comparison_data).dropna()
         if not comparison_df.empty:
@@ -482,24 +643,45 @@ async def build_comparison(
             comparison_df, name_map, portfolio_color_map,
             range_label, fx_adjust, base_currency,
             title="Portfolio Comparison",
+            mobile=is_mobile(),
         )
 
-        # Add SPY benchmark overlay
-        if show_bench and spy_series is not None and not spy_series.empty:
-            spy_rebased = spy_series / spy_series.iloc[0] * 100
+        # Add local market benchmark overlay
+        if show_bench and bench_series is not None and not bench_series.empty:
+            bench_rebased = bench_series / bench_series.iloc[0] * 100
             import plotly.graph_objects as go
             fig.add_trace(go.Scatter(
-                x=spy_rebased.index, y=spy_rebased.values,
-                mode="lines", name="SPY",
+                x=bench_rebased.index, y=bench_rebased.values,
+                mode="lines", name=bench_name,
                 line=dict(color="#F59E0B", width=2),
-                hovertemplate="SPY: %{y:.1f}<extra></extra>",
+                hovertemplate=f"{bench_name}: %{{y:.1f}}<extra></extra>",
             ))
+
+        # Apply ticker visibility toggles — match by trace name, not index
+        for trace in fig.data:
+            for ticker, visible in ticker_visibility.items():
+                if ticker in trace.name:
+                    trace.visible = True if visible else "legendonly"
+                    break
 
         if chart_height:
             fig.update_layout(height=chart_height)
+        if is_mobile():
+            fig.update_layout(height=220)
 
         with chart_container:
             ui.plotly(fig).classes("w-full")
+
+    async def _toggle_ticker(ticker: str):
+        ticker_visibility[ticker] = not ticker_visibility[ticker]
+        _render_pills()
+        await _debounced_update()
+
+    async def _set_all(visible: bool):
+        for t in ticker_visibility:
+            ticker_visibility[t] = visible
+        _render_pills()
+        await _debounced_update()
 
     # Debounce rapid toggles (#27)
     _debounce_timer = {"handle": None}
@@ -513,6 +695,7 @@ async def build_comparison(
     bench_switch.on_value_change(_debounced_update)
 
     # Initial render
+    _render_pills()
     await update_chart()
 
 
