@@ -7,7 +7,7 @@ import os
 import re
 
 import pandas as pd
-from nicegui import run, ui
+from nicegui import app, run, ui
 
 from src.charts import CHART_COLORS, FALLBACK_COLORS
 from src.fx import CURRENCY_SYMBOLS, get_fx_rate, get_historical_fx_rate, get_ticker_currency
@@ -17,6 +17,7 @@ from src.theme import (
     BORDER, BORDER_INPUT, BORDER_SUBTLE,
     TEXT_DIM, TEXT_MUTED, TEXT_PRIMARY,
 )
+from src.billing import FREE_POSITION_LIMIT, is_pro
 from src.ui.shared import load_portfolio, save_portfolio
 
 # ── Sample portfolio path ──
@@ -338,6 +339,16 @@ def build_sidebar(
             "purchase_date": str(purchase_date) if purchase_date else None,
             "manual_price": manual,
         }
+
+        # Position limit for free users (only applies when adding a new ticker)
+        if ticker not in portfolio:
+            _uid = app.storage.user.get("user_id")
+            if not is_pro(_uid) and len(portfolio) >= FREE_POSITION_LIMIT:
+                ui.notify(
+                    f"Free plan allows up to {FREE_POSITION_LIMIT} positions. Upgrade to Pro for unlimited.",
+                    type="warning",
+                )
+                return
 
         portfolio.setdefault(ticker, []).append(lot)
         stored = load_portfolio()
