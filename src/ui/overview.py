@@ -459,7 +459,7 @@ async def build_comparison(
 
             # Fetch SPY benchmark if requested
             spy_series = None
-            if show_bench:
+            if show_bench and "SPY" not in portfolio:
                 try:
                     period = selected_range if selected_range != "since" else "max"
                     spy_hist = fetch_price_history_range("SPY", period)
