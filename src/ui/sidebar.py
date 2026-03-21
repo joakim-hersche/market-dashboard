@@ -218,6 +218,17 @@ def build_sidebar(
     manual_checkbox.on_value_change(_on_manual_change)
 
     # ── Add Position logic ─────────────────────────────────
+    async def _validate_ticker(ticker: str) -> bool:
+        """Check if a ticker returns data from the provider."""
+        from src.data_fetch import get_provider
+        try:
+            result = await run.io_bound(
+                lambda: get_provider().get_price_history_short(ticker)
+            )
+            return not result.empty
+        except Exception:
+            return False
+
     async def on_add_position():
         add_btn.disable()
         spinner = ui.spinner("dots", size="sm")
@@ -235,6 +246,12 @@ def build_sidebar(
         if not _is_valid_ticker(ticker):
             ui.notify("Invalid ticker symbol.", type="negative")
             return
+
+        if ticker not in all_tickers:
+            valid = await _validate_ticker(ticker)
+            if not valid:
+                ui.notify("Ticker not found — check the symbol and try again", type="warning")
+                return
 
         market = _infer_market(ticker)
         is_alt = market in _ALT_ASSETS if market else False
