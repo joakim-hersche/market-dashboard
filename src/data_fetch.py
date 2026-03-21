@@ -15,11 +15,26 @@ logger = logging.getLogger(__name__)
 
 from src.cache import short_cache, long_cache, long_cache_history, long_cache_simulation, long_cache_analytics, long_cache_fundamentals, long_cache_names, lenient_key
 
+from src.providers import YFinanceProvider
+
+_provider = YFinanceProvider()
+
+
+def get_provider():
+    """Return the active data provider instance.
+
+    Currently always returns YFinanceProvider. When a paid provider
+    (e.g., EOD Historical Data) is added, this will read
+    DATA_PROVIDER env var to select the implementation.
+    """
+    return _provider
+
+
 from src.fx import get_ticker_currency, CURRENCY_SYMBOLS
 from src.monte_carlo import run_monte_carlo_backtest, run_monte_carlo_portfolio, run_monte_carlo_ticker
 from src.stocks import (
     get_sp500_stocks, get_ftse100_stocks, get_dax_stocks,
-    get_cac40_stocks, get_smi_stocks, get_aex_stocks,
+    get_cac40_stocks, get_smi_stocks, get_smim_stocks, get_aex_stocks,
     get_ibex_stocks, get_omx30_stocks, get_etfs, get_crypto,
     get_commodities, get_reits, get_bonds, get_emerging_markets,
 )
@@ -157,6 +172,104 @@ def fetch_price_history_range(ticker: str, period: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@cached(short_cache)
+def fetch_ticker_news(ticker: str) -> list[dict]:
+    """Fetch recent news for a ticker. Cached for 5 minutes."""
+    try:
+        news = yf.Ticker(ticker).news
+        if not news:
+            return []
+        results = []
+        for item in news:
+            # yfinance >= 0.2.36 nests data under 'content'
+            content = item.get("content", item)
+            provider = content.get("provider", {})
+            canonical = content.get("canonicalUrl", {})
+            # Parse pubDate (ISO string) or fall back to providerPublishTime (unix)
+            pub_time = 0
+            pub_date = content.get("pubDate", "")
+            if pub_date:
+                from datetime import datetime, timezone
+                try:
+                    pub_time = int(datetime.fromisoformat(
+                        pub_date.replace("Z", "+00:00")
+                    ).timestamp())
+                except (ValueError, TypeError):
+                    pub_time = item.get("providerPublishTime", 0)
+            else:
+                pub_time = item.get("providerPublishTime", 0)
+            results.append({
+                "title": content.get("title", item.get("title", "")),
+                "publisher": provider.get("displayName", item.get("publisher", "")),
+                "link": canonical.get("url", item.get("link", "")),
+                "providerPublishTime": pub_time,
+            })
+        return results
+    except Exception:
+        return []
+
+
+@cached(long_cache_fundamentals, key=lenient_key)
+def fetch_sector_peers(sector, candidate_tickers, target_ticker, max_peers=4):
+    """Find same-sector peers from candidate tickers. Cached for 24 hours."""
+    peers = []
+    for ticker in candidate_tickers:
+        if len(peers) >= max_peers:
+            break
+        if ticker == target_ticker:
+            continue
+        try:
+            info = yf.Ticker(ticker).info
+            if info.get("sector", "") != sector:
+                continue
+            hist = yf.Ticker(ticker).history(period="1y")
+            return_1y = None
+            if not hist.empty and "Close" in hist.columns:
+                close = hist["Close"].dropna()
+                if len(close) >= 2:
+                    return_1y = round((close.iloc[-1] / close.iloc[0] - 1) * 100, 1)
+            peers.append({
+                "ticker": ticker,
+                "name": info.get("shortName", ticker),
+                "pe": info.get("trailingPE"),
+                "div_yield": round(info.get("dividendYield", 0) * 100, 2) if info.get("dividendYield") else None,
+                "beta": info.get("beta"),
+                "return_1y": return_1y,
+            })
+        except Exception:
+            continue
+    return peers
+
+
+@cached(long_cache_fundamentals, key=lenient_key)
+def fetch_sector_medians(sector, candidate_tickers, max_samples=10):
+    """Compute median P/E and dividend yield for a sector. Cached for 24 hours."""
+    import statistics
+
+    pe_values, dy_values = [], []
+    sampled = 0
+    for ticker in candidate_tickers:
+        if sampled >= max_samples:
+            break
+        try:
+            info = yf.Ticker(ticker).info
+            if info.get("sector") != sector:
+                continue
+            sampled += 1
+            pe = info.get("trailingPE")
+            if pe and pe > 0:
+                pe_values.append(pe)
+            dy = info.get("dividendYield")
+            if dy and dy > 0:
+                dy_values.append(dy * 100)
+        except Exception:
+            continue
+    return {
+        "median_pe": round(statistics.median(pe_values), 1) if pe_values else None,
+        "median_div_yield": round(statistics.median(dy_values), 2) if dy_values else None,
+    }
+
+
 @cached(long_cache, key=lenient_key)
 def cached_run_monte_carlo_backtest(portfolio: dict, price_data: dict) -> dict:
     """Cached wrapper for run_monte_carlo_backtest. Recomputes when portfolio or price data changes."""
@@ -207,6 +320,7 @@ def load_stock_options() -> dict:
         ("Germany — DAX",      get_dax_stocks),
         ("France — CAC 40",    get_cac40_stocks),
         ("Switzerland — SMI",  get_smi_stocks),
+        ("Switzerland — SMIM", get_smim_stocks),
         ("Netherlands — AEX",  get_aex_stocks),
         ("Spain — IBEX 35",    get_ibex_stocks),
         ("Sweden — OMX 30",    get_omx30_stocks),

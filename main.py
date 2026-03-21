@@ -40,7 +40,8 @@ from src.charts import FALLBACK_COLORS
 from src.ui.forecast import build_forecast_tab
 from src.ui.income import build_income_tab
 from src.ui.positions import build_positions_tab
-from src.ui.risk import build_risk_tab
+from src.ui.health import build_health_tab
+from src.ui.research import build_research_tab
 from src.data_fetch import fetch_company_name, load_stock_options
 from src.fx import CURRENCY_SYMBOLS
 from src.portfolio import build_portfolio_df
@@ -52,7 +53,7 @@ from src.ui.sidebar import build_sidebar
 from src.theme import (
     ACCENT, BG_CARD, BG_INPUT, BG_MAIN, BG_SIDEBAR, BG_TOPBAR,
     BORDER, BORDER_INPUT, BORDER_SUBTLE, GLOBAL_CSS,
-    GREEN, AMBER, RED, TEXT_FAINT,
+    GREEN, RED, TEXT_FAINT,
     TEXT_DIM, TEXT_MUTED, TEXT_PRIMARY,
 )
 
@@ -78,123 +79,48 @@ _PWA_HEAD = """
 <link rel="apple-touch-icon" sizes="192x192" href="/static/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Market-Dashboard">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0F1117">
 """
 
 
-def _get_market_status() -> tuple[str, str]:
-    """Return (label, color) for current NYSE market status.
+_EXCHANGE_MAP = {
+    "USD": ("NYSE", "America/New_York", (9, 30), (16, 0)),
+    "CHF": ("SIX", "Europe/Zurich", (9, 0), (17, 30)),
+    "EUR": ("XETRA", "Europe/Berlin", (9, 0), (17, 30)),
+    "GBP": ("LSE", "Europe/London", (8, 0), (16, 30)),
+    "SEK": ("OMX", "Europe/Stockholm", (9, 0), (17, 30)),
+}
 
-    Uses pure timezone calculation with rule-based US holidays.
+
+def _get_market_status(currency: str = "USD") -> tuple[str, str, str]:
+    """Return (exchange_name, label, color) for the local market.
+
+    Uses timezone-based business hours check. Does not track per-exchange
+    holidays — shows 'Open' on national holidays if they fall on a weekday.
     """
     from zoneinfo import ZoneInfo
 
-    et = datetime.datetime.now(ZoneInfo("America/New_York"))
-    weekday = et.weekday()  # 0=Mon, 6=Sun
-    hour, minute = et.hour, et.minute
-    t = hour * 60 + minute  # minutes since midnight
+    exchange, tz_name, (open_h, open_m), (close_h, close_m) = _EXCHANGE_MAP.get(
+        currency, _EXCHANGE_MAP["USD"]
+    )
+    now = datetime.datetime.now(ZoneInfo(tz_name))
+    weekday = now.weekday()
+    t = now.hour * 60 + now.minute
 
-    # Rule-based US market holidays
-    year = et.year
-    holidays: set[tuple[int, int]] = set()
+    if weekday >= 5:
+        return exchange, "Closed", RED
 
-    # New Year's Day — Jan 1 (if Sunday, observed Monday)
-    d = datetime.date(year, 1, 1)
-    if d.weekday() == 6:
-        holidays.add((1, 2))
-    else:
-        holidays.add((1, 1))
+    open_t = open_h * 60 + open_m
+    close_t = close_h * 60 + close_m
 
-    # MLK Day — 3rd Monday of January
-    jan1 = datetime.date(year, 1, 1)
-    first_mon = jan1 + datetime.timedelta(days=(7 - jan1.weekday()) % 7)
-    mlk = first_mon + datetime.timedelta(weeks=2)
-    holidays.add((mlk.month, mlk.day))
-
-    # Presidents' Day — 3rd Monday of February
-    feb1 = datetime.date(year, 2, 1)
-    first_mon = feb1 + datetime.timedelta(days=(7 - feb1.weekday()) % 7)
-    pres = first_mon + datetime.timedelta(weeks=2)
-    holidays.add((pres.month, pres.day))
-
-    # Good Friday — 2 days before Easter (anonymous algorithm)
-    a = year % 19
-    b, c = divmod(year, 100)
-    d_v, e = divmod(b, 4)
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d_v - g + 15) % 30
-    i, k = divmod(c, 4)
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month_e = (h + l - 7 * m + 114) // 31
-    day_e = ((h + l - 7 * m + 114) % 31) + 1
-    easter = datetime.date(year, month_e, day_e)
-    good_friday = easter - datetime.timedelta(days=2)
-    holidays.add((good_friday.month, good_friday.day))
-
-    # Memorial Day — last Monday of May
-    may31 = datetime.date(year, 5, 31)
-    memorial = may31 - datetime.timedelta(days=(may31.weekday()) % 7)
-    holidays.add((memorial.month, memorial.day))
-
-    # Juneteenth — June 19 (observed)
-    d = datetime.date(year, 6, 19)
-    if d.weekday() == 5:
-        holidays.add((6, 18))
-    elif d.weekday() == 6:
-        holidays.add((6, 20))
-    else:
-        holidays.add((6, 19))
-
-    # Independence Day — July 4 (observed)
-    d = datetime.date(year, 7, 4)
-    if d.weekday() == 5:
-        holidays.add((7, 3))
-    elif d.weekday() == 6:
-        holidays.add((7, 5))
-    else:
-        holidays.add((7, 4))
-
-    # Labor Day — 1st Monday of September
-    sep1 = datetime.date(year, 9, 1)
-    labor = sep1 + datetime.timedelta(days=(7 - sep1.weekday()) % 7)
-    holidays.add((labor.month, labor.day))
-
-    # Thanksgiving — 4th Thursday of November
-    nov1 = datetime.date(year, 11, 1)
-    first_thu = nov1 + datetime.timedelta(days=(3 - nov1.weekday()) % 7)
-    thanks = first_thu + datetime.timedelta(weeks=3)
-    holidays.add((thanks.month, thanks.day))
-
-    # Christmas — Dec 25 (observed)
-    d = datetime.date(year, 12, 25)
-    if d.weekday() == 5:
-        holidays.add((12, 24))
-    elif d.weekday() == 6:
-        holidays.add((12, 26))
-    else:
-        holidays.add((12, 25))
-
-    is_holiday = (et.month, et.day) in holidays
-
-    if weekday >= 5 or is_holiday:
-        return "Closed", RED
-
-    # Pre-market: 4:00-9:30 ET
-    if 240 <= t < 570:
-        return "Pre-market", AMBER
-    # Regular hours: 9:30-16:00 ET
-    if 570 <= t < 960:
-        return "Open", GREEN
-    # After hours: 16:00-20:00 ET
-    if 960 <= t < 1200:
-        return "After hours", AMBER
-    return "Closed", RED
+    if open_t <= t < close_t:
+        return exchange, "Open", GREEN
+    return exchange, "Closed", RED
 
 
-_TAB_NAMES = ["Overview", "Positions", "Risk & Analytics", "Income", "Forecast", "Guide"]
+
+_TAB_NAMES = ["Overview", "Positions", "Portfolio Health", "Income", "Forecast", "Research", "Guide"]
 
 
 def _tab_url(tab_name: str | None = None) -> str:
@@ -285,6 +211,82 @@ async def index(request: Request):
 
     # ── Head: CSS + PWA ────────────────────────────────────
     ui.add_head_html(GLOBAL_CSS)
+    ui.add_head_html("""<script>
+// Add-to-homescreen prompt for mobile Safari/Chrome
+(function() {
+  var isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+  var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  var dismissed = localStorage.getItem('a2hs_dismissed');
+  if (isMobile && !isStandalone && !dismissed) {
+    setTimeout(function() {
+      var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      var instruction = isIOS
+        ? 'Tap <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" style="vertical-align:middle;margin:0 2px;"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> then <b>Add to Home Screen</b>'
+        : 'Tap <b>⋮</b> then <b>Add to Home Screen</b>';
+      var banner = document.createElement('div');
+      banner.className = 'a2hs-banner';
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'a2hs-close';
+      closeBtn.innerHTML = '&times;';
+      closeBtn.addEventListener('click', function() {
+        banner.remove();
+        localStorage.setItem('a2hs_dismissed', '1');
+      });
+      var iconDiv = document.createElement('div');
+      iconDiv.style.cssText = 'width:40px;height:40px;border-radius:10px;background:#111318;border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+      iconDiv.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+      var textDiv = document.createElement('div');
+      textDiv.innerHTML = '<div style="font-size:13px;font-weight:600;color:#F1F5F9;">Install Market Dashboard</div>' +
+        '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">' + instruction + '</div>';
+      banner.appendChild(closeBtn);
+      banner.appendChild(iconDiv);
+      banner.appendChild(textDiv);
+      document.body.appendChild(banner);
+    }, 3000);
+  }
+})();
+
+// Swipe hint: peek first position row on first sidebar open
+function triggerSwipeHint() {
+  if (localStorage.getItem('sidebar_swipe_hint')) return;
+  localStorage.setItem('sidebar_swipe_hint', '1');
+  setTimeout(function() {
+    var firstSlide = document.querySelector('.touch-only .q-slide-item .q-slide-item__content');
+    if (!firstSlide) return;
+    firstSlide.style.transition = 'transform 0.4s ease-out';
+    firstSlide.style.transform = 'translateX(-40px)';
+    setTimeout(function() {
+      firstSlide.style.transition = 'transform 0.6s ease-in-out';
+      firstSlide.style.transform = 'translateX(0)';
+    }, 1500);
+  }, 500);
+}
+
+// Watch for sidebar open to trigger hint
+(function() {
+  var hintObserver = new MutationObserver(function(muts) {
+    for (var i = 0; i < muts.length; i++) {
+      var target = muts[i].target;
+      if (target.classList && target.classList.contains('q-layout__drawer--left')
+          && !target.classList.contains('q-layout__drawer--mini')) {
+        // Check if drawer just became visible
+        var drawer = document.querySelector('.q-drawer--left');
+        if (drawer && getComputedStyle(drawer).visibility === 'visible') {
+          triggerSwipeHint();
+          break;
+        }
+      }
+    }
+  });
+  // Start observing after a delay to let the page render
+  setTimeout(function() {
+    var layout = document.querySelector('.q-layout');
+    if (layout) {
+      hintObserver.observe(layout, {attributes: true, subtree: true, attributeFilter: ['class']});
+    }
+  }, 2000);
+})();
+</script>""")
     ui.add_head_html(_PWA_HEAD)
 
     # Force dark mode to match design concept
@@ -301,33 +303,45 @@ async def index(request: Request):
     # Mutable ref so sidebar callbacks can read the active tab
     _active_tab = {"name": initial_tab_name}
 
+    # Forward ref for sidebar drawer (assigned after drawer creation)
+    _drawer_ref: dict = {"drawer": None}
+
     # ── Top bar ────────────────────────────────────────────
     with ui.header().classes("items-center justify-between px-5").style(
         f"height: 48px; background: {BG_TOPBAR}; border-bottom: 1px solid {BORDER};"
     ):
-        # Left: title with accent dot + market status
+        # Left: hamburger (mobile) + title with accent dot + market status
         with ui.row().classes("items-center gap-2"):
+            # Hamburger icon (visible only on mobile via CSS)
+            ui.button(
+                icon="menu", on_click=lambda: _drawer_ref["drawer"].toggle() if _drawer_ref["drawer"] else None
+            ).props("flat dense round size=sm color=none").classes("hamburger-btn").style(
+                f"color:{TEXT_MUTED} !important;min-width:0;width:36px;height:36px;"
+            )
             ui.html(
                 f'<div style="width:8px;height:8px;border-radius:50%;background:{ACCENT};"></div>'
             )
             ui.label("Market Dashboard").style(
                 f"font-size:14px; font-weight:700; color:{TEXT_PRIMARY}; letter-spacing:0.02em;"
             )
-            # Market status indicator
-            status_label, status_color = _get_market_status()
-            ui.html(
-                f'<div style="display:flex;align-items:center;gap:5px;margin-left:8px;">'
-                f'<div style="width:7px;height:7px;border-radius:50%;background:{status_color};"></div>'
-                f'<span style="font-size:10px;color:{TEXT_FAINT};font-weight:500;">NYSE {status_label}</span>'
-                f'</div>'
-            )
+            # Market status indicator (refreshable so it updates on currency change)
+            @ui.refreshable
+            def market_status_indicator():
+                ex_name, label, color = _get_market_status(currency)
+                ui.html(
+                    f'<div style="display:flex;align-items:center;gap:5px;margin-left:8px;">'
+                    f'<div style="width:7px;height:7px;border-radius:50%;background:{color};"></div>'
+                    f'<span style="font-size:10px;color:{TEXT_FAINT};font-weight:500;">{ex_name} {label}</span>'
+                    f'</div>'
+                )
+            market_status_indicator()
 
         # Right: currency pill + export dropdown + info
         with ui.row().classes("items-center gap-2").style("height:32px;"):
 
             # ── Currency segmented pill ────────────────────────
             currencies = list(CURRENCY_SYMBOLS.keys())
-            pill_container = ui.element("div").style(
+            pill_container = ui.element("div").classes("header-currency-pills").style(
                 f"display:flex; border:1px solid rgba(59,130,246,0.3); border-radius:8px; overflow:hidden;"
             )
             currency_buttons: dict[str, ui.button] = {}
@@ -369,7 +383,7 @@ async def index(request: Request):
                 ui.download(_json.dumps(portfolio, indent=2).encode(), "portfolio.json")
                 ui.notify("Portfolio backup downloaded.", type="positive")
 
-            with ui.button("Export", icon="expand_more").props(
+            with ui.button("Export", icon="expand_more").classes("header-export-btn").props(
                 'flat dense no-caps size=sm color=none'
             ).style(
                 f"border:1px solid {BORDER_INPUT}; border-radius:6px; padding:0 12px;"
@@ -427,7 +441,7 @@ async def index(request: Request):
                         f"font-size:11px;padding:6px 16px;text-transform:none;"
                     )
 
-            ui.button(icon="info", on_click=about_dlg.open).props(
+            ui.button(icon="info", on_click=about_dlg.open).classes("header-info-btn").props(
                 "flat dense round size=sm color=none"
             ).style(
                 f"color:{TEXT_MUTED} !important; min-width:0; width:32px; height:32px;"
@@ -488,8 +502,52 @@ async def index(request: Request):
     # ── Sidebar (left drawer) ──────────────────────────────
     with ui.left_drawer(value=True, fixed=True).classes("sidebar").style(
         f"width:220px; background:{BG_SIDEBAR}; border-right:1px solid {BORDER}; padding:16px 12px;"
-    ).props('width=220 :breakpoint="768"'):
+    ).props('width=220 :breakpoint="768"') as sidebar_drawer:
+        _drawer_ref["drawer"] = sidebar_drawer
+
+        # ── Zone 1: Fixed top (mobile) — title + close ──
+        with ui.element("div").classes("sidebar-zone-top touch-only"):
+            with ui.row().classes("w-full items-center justify-between").style("margin-bottom:10px;"):
+                ui.label("Portfolio").style(
+                    f"font-size:15px;font-weight:700;color:{TEXT_PRIMARY};"
+                )
+                ui.button(
+                    icon="close", on_click=lambda: sidebar_drawer.hide()
+                ).props("flat dense round size=md color=none").style(
+                    f"color:{TEXT_MUTED};min-width:44px;min-height:44px;"
+                )
+
+        # ── Zone 2: sidebar content (search + positions scroll on mobile) ──
         build_sidebar(portfolio, stock_options, _shared, _active_tab, on_mutation=_mutation_ref)
+
+        # ── Zone 3: Pinned bottom (mobile) — actions + currency ──
+        with ui.element("div").classes("sidebar-zone-bottom touch-only"):
+            ui.html(
+                f'<div style="font-size:10px;font-weight:700;color:{TEXT_MUTED};'
+                f'letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Currency</div>'
+            )
+            sidebar_pill = ui.element("div").classes("sidebar-currency-pills").style(
+                f"display:flex;width:100%;border:1px solid rgba(59,130,246,0.3);border-radius:8px;overflow:hidden;"
+            )
+            with sidebar_pill:
+                for i, ccy in enumerate(currencies):
+                    style = _pill_active if ccy == currency else _pill_inactive
+                    if i == 0:
+                        style = style.replace("border-left:1px solid rgba(59,130,246,0.2); ", "")
+                    ui.button(
+                        ccy,
+                        on_click=lambda c=ccy: _on_pill_click(c),
+                    ).props("flat dense no-caps size=sm unelevated").style(style)
+
+    # Close sidebar on mobile (it starts open for desktop, but covers everything on mobile)
+    ui.run_javascript("""
+        if (window.innerWidth <= 767) {
+            setTimeout(function() {
+                var backdrop = document.querySelector('.q-drawer__backdrop');
+                if (backdrop) backdrop.click();
+            }, 200);
+        }
+    """)
 
     # ── Main content area ──────────────────────────────────
     with ui.column().classes("w-full").style(f"background:{BG_MAIN}; min-height:100vh;"):
@@ -526,12 +584,14 @@ async def index(request: Request):
                         await build_overview_tab(portfolio, currency, portfolio_color_map)
                     elif name == "Positions":
                         await build_positions_tab(portfolio, currency)
-                    elif name == "Risk & Analytics":
-                        await build_risk_tab(portfolio, currency)
+                    elif name == "Portfolio Health":
+                        await build_health_tab(portfolio, currency)
                     elif name == "Income":
                         await build_income_tab(portfolio, currency, portfolio_color_map)
                     elif name == "Forecast":
                         await build_forecast_tab(portfolio, currency)
+                    elif name == "Research":
+                        await build_research_tab(portfolio, currency, stock_options)
                     elif name == "Guide":
                         build_guide_tab()
             finally:
@@ -559,6 +619,37 @@ async def index(request: Request):
             if not _tab_built.get(e.value):
                 await _build_tab(e.value)
         tabs.on_value_change(_on_tab_change)
+
+        # ── Mobile bottom tab bar (pure NiceGUI elements) ────
+        _MOBILE_TABS = [
+            ("Overview", "Overview", "grid_view"),
+            ("Positions", "Positions", "list"),
+            ("Health", "Portfolio Health", "monitor_heart"),
+            ("Research", "Research", "search"),
+            ("Guide", "Guide", "menu_book"),
+        ]
+        _mobile_tab_els: dict[str, ui.element] = {}
+
+        def _switch_mobile_tab(tab_name: str):
+            tabs.set_value(tab_map[tab_name])
+            for name, el in _mobile_tab_els.items():
+                if name == tab_name:
+                    el.classes(add="active")
+                else:
+                    el.classes(remove="active")
+            # Close sidebar if open
+            if _drawer_ref["drawer"]:
+                _drawer_ref["drawer"].hide()
+
+        with ui.element("div").classes("mobile-tab-bar"):
+            for label, tab_name, icon_name in _MOBILE_TABS:
+                is_active = tab_map.get(initial_tab_name) == tab_map.get(tab_name)
+                with ui.element("div").classes(
+                    f"tab-item{'  active' if is_active else ''}"
+                ).on("click", lambda _, tn=tab_name: _switch_mobile_tab(tn)) as tab_el:
+                    ui.icon(icon_name).style("font-size:20px;")
+                    ui.label(label).classes("tab-label")
+                    _mobile_tab_els[tab_name] = tab_el
 
         # ── Persistent disclaimer footer ──────────────────────────
         ui.html(
@@ -618,7 +709,8 @@ async def index(request: Request):
         for name in _TAB_NAMES:
             _tab_built[name] = False
         await _build_tab(_active_tab["name"])
-        # Refresh sidebar to show updated currency symbols and values
+        # Refresh market status and sidebar
+        market_status_indicator.refresh()
         if _mutation_ref.get("sidebar_refresh"):
             _mutation_ref["sidebar_refresh"]()
 
@@ -642,4 +734,5 @@ ui.run(
     port=int(os.environ.get("PORT", "8080")),
     dark=True,
     storage_secret=get_storage_secret(),
+    viewport="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
 )
