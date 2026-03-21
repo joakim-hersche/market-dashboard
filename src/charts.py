@@ -49,6 +49,24 @@ def _apply_default_layout(fig: go.Figure, **overrides) -> go.Figure:
     return fig
 
 
+def _mobile_overrides(fig: go.Figure) -> go.Figure:
+    """Apply mobile-specific layout overrides. Call AFTER chart-specific layout."""
+    fig.update_layout(
+        dragmode=False,
+        hovermode="closest",
+        hoverlabel=dict(font=dict(size=10)),
+    )
+    fig.update_xaxes(
+        tickfont=dict(size=9),
+        title=None,
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=9),
+        title=None,
+    )
+    return fig
+
+
 # ── QQ plot ──────────────────────────────────────────────────────────────────
 
 def build_qq_plot(
