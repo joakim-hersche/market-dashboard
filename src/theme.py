@@ -424,22 +424,15 @@ body, .q-page, .nicegui-content {
   /* Utility class */
   .not-phone { display: none !important; }
 
-  /* ── Mobile sidebar: three-zone flex layout ── */
+  /* ── Mobile sidebar: JS creates wrapper with three zones ── */
   .q-drawer { width: 100vw !important; max-width: 100vw !important; }
-  .q-drawer__content {
+
+  /* The wrapper is injected by JS around the drawer content */
+  .sidebar-mobile-wrapper {
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
     height: 100%% !important;
-  }
-  .q-drawer .sidebar {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 !important;
     overflow: hidden !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    height: 100%% !important;
   }
 
   /* Zone 1: Fixed top — title + close + search */
@@ -447,58 +440,24 @@ body, .q-page, .nicegui-content {
     flex-shrink: 0;
     padding: 12px 20px 8px;
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
-    border-bottom: 1px solid rgba(255,255,255,0.06);
   }
 
-  /* Zone 2: Scrollable middle — everything between top and bottom zones */
-  .sidebar-zone-positions {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    min-height: 0;
-    padding: 8px 0;
-  }
-  /* Make the entire mid-section (search + form + positions + actions) scroll as one */
-  .q-drawer .sidebar > .nicegui-content {
+  /* Zone 2: Scrollable middle */
+  .sidebar-zone-mid {
     flex: 1 !important;
     overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
+    -webkit-overflow-scrolling: touch;
     min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  /* Zone-positions should NOT independently scroll — the parent scrolls */
-  .q-drawer .sidebar > .nicegui-content .sidebar-zone-positions {
-    flex: none !important;
-    overflow-y: visible !important;
+    padding: 8px 16px;
   }
 
   /* Zone 3: Pinned bottom — actions + currency */
   .sidebar-zone-bottom {
-    flex-shrink: 0 !important;
-    flex-grow: 0 !important;
+    flex-shrink: 0;
     border-top: 1px solid rgba(255,255,255,0.08);
     background: #161719;
     padding: 12px 20px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-  /* Move mobile action grid into the bottom zone visually */
-  .sidebar-action-grid {
-    position: sticky !important;
-    bottom: 0;
-    background: #161719;
-    padding-bottom: 8px !important;
-    z-index: 2;
-  }
-
-  /* Add horizontal padding to sidebar content on mobile (sidebar itself has padding:0) */
-  .q-drawer .sidebar > .nicegui-content > * {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .q-drawer .sidebar > .nicegui-content .sidebar-zone-positions {
-    padding-left: 0;
-    padding-right: 0;
   }
 
   /* Mobile position rows */

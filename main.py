@@ -653,14 +653,82 @@ function triggerSwipeHint() {
                         on_click=lambda c=ccy: _on_pill_click(c),
                     ).props("flat dense no-caps size=sm unelevated").style(style)
 
-    # Close sidebar on mobile (it starts open for desktop, but covers everything on mobile)
+    # On mobile: restructure sidebar DOM into three-zone layout, then auto-close
     ui.run_javascript("""
-        if (window.innerWidth <= 767) {
+    (function() {
+        if (!window.matchMedia('(pointer: coarse)').matches && window.innerWidth > 767) return;
+
+        setTimeout(function() {
+            var drawerContent = document.querySelector('.q-drawer__content');
+            if (!drawerContent) return;
+
+            // Find the key elements
+            var zoneTop = drawerContent.querySelector('.sidebar-zone-top');
+            var zoneBottom = drawerContent.querySelector('.sidebar-zone-bottom');
+            var search = drawerContent.querySelector('.sidebar-search');
+            var actionGrid = drawerContent.querySelector('.sidebar-action-grid');
+
+            // Create the three-zone wrapper
+            var wrapper = document.createElement('div');
+            wrapper.className = 'sidebar-mobile-wrapper';
+
+            // Zone 1: top (title + close + search)
+            if (zoneTop) {
+                wrapper.appendChild(zoneTop);
+                // Move search bar into zone-top
+                if (search) {
+                    // search is inside a NiceGUI wrapper div — move the wrapper
+                    var searchParent = search.closest('.nicegui-content > div') || search.parentElement;
+                    zoneTop.appendChild(searchParent);
+                }
+            }
+
+            // Zone 2: scrollable mid — everything else except zone-bottom and action-grid
+            var mid = document.createElement('div');
+            mid.className = 'sidebar-zone-mid';
+
+            // Move all remaining content into mid
+            var content = drawerContent.querySelector('.nicegui-content') ||
+                          drawerContent.querySelector('.sidebar');
+            if (content) {
+                // Move all children of content into mid
+                while (content.firstChild) {
+                    var child = content.firstChild;
+                    // Skip zone-top and zone-bottom (already moved or will be)
+                    if (child === zoneTop || child === zoneBottom) {
+                        content.removeChild(child);
+                        continue;
+                    }
+                    mid.appendChild(child);
+                }
+            }
+            wrapper.appendChild(mid);
+
+            // Zone 3: bottom (actions + currency)
+            if (zoneBottom) {
+                // Move action grid into zone-bottom (before currency)
+                if (actionGrid) {
+                    var agParent = actionGrid.parentElement;
+                    zoneBottom.insertBefore(actionGrid, zoneBottom.firstChild);
+                    // Clean up empty parent if needed
+                    if (agParent && agParent !== mid && agParent.children.length === 0) {
+                        agParent.remove();
+                    }
+                }
+                wrapper.appendChild(zoneBottom);
+            }
+
+            // Replace drawer content
+            drawerContent.innerHTML = '';
+            drawerContent.appendChild(wrapper);
+
+            // Auto-close sidebar on mobile
             setTimeout(function() {
                 var backdrop = document.querySelector('.q-drawer__backdrop');
                 if (backdrop) backdrop.click();
-            }, 200);
-        }
+            }, 100);
+        }, 500);
+    })();
     """)
 
     # ── Main content area ──────────────────────────────────
