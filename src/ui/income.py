@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from nicegui import run, ui
 
-from src.charts import _apply_default_layout
+from src.charts import _apply_default_layout, is_mobile
 from src.data_fetch import fetch_fundamentals
 from src.fx import CURRENCY_SYMBOLS, get_fx_rate, get_ticker_currency
 from src.portfolio import build_dividend_timeline, build_portfolio_df
@@ -147,7 +147,7 @@ async def build_income_tab(
 
     # ── KPI Cards ─────────────────────────────────────────
     ui.html(f"""
-        <div class="kpi-row" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="kpi-row">
             <div class="kpi-card">
                 <div class="kpi-label">Trailing 12M Income</div>
                 <div class="kpi-value">{_fmt_currency(trailing_12m, currency_symbol)}</div>
@@ -269,7 +269,7 @@ def _build_income_chart(
     fig = go.Figure({"data": traces})
     _apply_default_layout(
         fig,
-        height=380,
+        height=280 if is_mobile() else 380,
         margin=dict(l=50, r=20, t=10, b=40),
         yaxis=dict(tickprefix=currency_symbol),
         showlegend=False,
@@ -419,7 +419,7 @@ def _build_dividend_calendar(
 
         table_html = f"""
         <div class="table-wrap" style="margin-top:10px;">
-            <table>
+            <table class="wide-table">
                 <thead><tr><th>Ticker</th>{header_cells}</tr></thead>
                 <tbody>{''.join(rows_html)}</tbody>
             </table>
