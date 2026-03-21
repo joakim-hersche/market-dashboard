@@ -31,6 +31,8 @@ class RateLimitError(Exception):
 
 # ── Rate limiting (in-memory) ────────────────────────────
 
+# In-memory only — resets on restart, not shared across processes.
+# Sufficient for single-process NiceGUI; would need Redis for multi-instance.
 _rate_limits: dict[str, list[float]] = {}
 
 _RATE_WINDOWS = {
@@ -60,7 +62,7 @@ def _check_rate(action: str, key: str) -> None:
 def _get_master_key() -> bytes:
     """Return the 32-byte master key from env."""
     hex_key = os.environ.get("MASTER_KEY", "")
-    if len(hex_key) < 64:
+    if len(hex_key) != 64:
         raise RuntimeError("MASTER_KEY must be a 64-char hex string (32 bytes)")
     return bytes.fromhex(hex_key)
 
@@ -219,5 +221,9 @@ def complete_password_reset(token: str, new_password: str) -> None:
 
 
 def _all_active_resets() -> list[dict]:
-    """Return all password_reset rows. Small-scale helper."""
-    return db._fetchall("SELECT * FROM password_resets")
+    """Return all non-expired password_reset rows."""
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    ph = db._p(1)[0]
+    return db._fetchall(
+        f"SELECT * FROM password_resets WHERE expires_at > {ph}", (now,)
+    )

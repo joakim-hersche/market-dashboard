@@ -1,4 +1,5 @@
 """Tests for src.auth — registration, login, verification, rate limiting."""
+import datetime
 import os
 import pytest
 import time
@@ -90,6 +91,21 @@ def test_verify_wrong_code():
     assert auth.verify_email(user_id, "000000") is False
 
 
+def test_verify_expired_code():
+    """Expired verification code should be rejected."""
+    user_id, code = auth.register("exp@example.com", "password123")
+    # Manually set verify_expires to the past
+    past = (
+        datetime.datetime.now(datetime.timezone.utc)
+        - datetime.timedelta(minutes=1)
+    ).isoformat()
+    db._execute(
+        f"UPDATE users SET verify_expires = {db._p(1)[0]} WHERE id = {db._p(1)[0]}",
+        (past, user_id),
+    )
+    assert auth.verify_email(user_id, code) is False
+
+
 # ── Rate limiting ──
 
 
@@ -124,6 +140,15 @@ def test_password_reset_unknown_email():
 
 
 # ── Encryption key wrapping ──
+
+
+def test_generate_new_verify_code():
+    """generate_new_verify_code should produce a fresh 6-digit code."""
+    user_id, old_code = auth.register("resend@example.com", "password123")
+    new_code = auth.generate_new_verify_code(user_id)
+    assert len(new_code) == 6 and new_code.isdigit()
+    # New code should work for verification
+    assert auth.verify_email(user_id, new_code) is True
 
 
 def test_encryption_key_wrapped_at_rest():
