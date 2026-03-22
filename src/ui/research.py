@@ -723,14 +723,11 @@ async def build_research_tab(
                 ticker, name, fund, extra_info, currency_symbol, currency
             )
 
-            # Two-column layout: fundamentals + portfolio fit
-            with ui.element("div").classes("charts-row").style("align-items:stretch;"):
-                with ui.column().style("gap:var(--grid-gap);"):
-                    _render_fundamentals(fund, extra_info, currency_symbol, medians)
-                with ui.column().style("gap:var(--grid-gap);justify-content:stretch;"):
-                    await _render_portfolio_fit(
-                        ticker, fund, extra_info, portfolio, currency
-                    )
+            # Fundamentals + portfolio fit (single row of cards)
+            _render_fundamentals(fund, extra_info, currency_symbol, medians)
+            await _render_portfolio_fit(
+                ticker, fund, extra_info, portfolio, currency
+            )
 
             # Price chart (hidden on mobile)
             with ui.element("div").classes("price-chart-section"):

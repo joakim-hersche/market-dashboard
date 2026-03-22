@@ -764,8 +764,9 @@ body, .q-page, .nicegui-content {
   .touch-large-only { display: block !important; }
   .mobile-only { display: none !important; }
 
-  /* Grids: narrower layout for tablets */
+  /* Grids: single-column layout (match phone) */
   .kpi-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .charts-row { grid-template-columns: 1fr; gap: 10px; }
   .risk-triple { grid-template-columns: 1fr; gap: 10px; }
   .risk-grid { grid-template-columns: 1fr; }
   .metric-grid-4 { grid-template-columns: repeat(2, 1fr); }
