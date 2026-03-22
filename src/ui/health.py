@@ -649,6 +649,126 @@ def _render_correlation_heatmap(price_data: dict, tickers: list) -> None:
                     )
 
 
+# ── Efficient Frontier ──────────────────────────────────────────────────────
+
+
+def _render_frontier_chart(
+    price_data_1y: dict,
+    portfolio_df: pd.DataFrame,
+) -> None:
+    """Render the Mean-CVaR efficient frontier scatter chart."""
+    tickers = [
+        t for t in portfolio_df["Ticker"].unique()
+        if not price_data_1y.get(t, pd.DataFrame()).empty
+    ]
+    if len(tickers) < 3:
+        return
+
+    try:
+        import plotly.graph_objects as go
+        from src.frontier import compute_efficient_frontier, portfolio_position
+    except ImportError:
+        return
+
+    # Build daily returns DataFrame
+    returns_dict = {}
+    for t in tickers:
+        df = price_data_1y[t]
+        if not df.empty and "Close" in df.columns:
+            returns_dict[t] = df["Close"].pct_change().dropna()
+    if len(returns_dict) < 3:
+        return
+    returns = pd.DataFrame(returns_dict).dropna()
+    if len(returns) < 30:
+        return
+
+    result = compute_efficient_frontier(returns)
+    if not result["frontier"]:
+        return
+
+    # Current portfolio weights
+    weights = (
+        portfolio_df.groupby("Ticker")["Weight (%)"].sum() / 100
+    ).to_dict()
+    port_cvar, port_ret = portfolio_position(returns, weights)
+
+    fig = go.Figure()
+
+    # Frontier line
+    f_cvar = [p[0] * 100 for p in result["frontier"]]
+    f_ret = [p[1] * 100 for p in result["frontier"]]
+    fig.add_trace(go.Scatter(
+        x=f_cvar, y=f_ret,
+        mode="lines+markers",
+        marker=dict(size=6, color=ACCENT),
+        line=dict(color=ACCENT, width=2),
+        name="Frontier",
+        hovertemplate="CVaR: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>",
+    ))
+
+    # Individual stocks
+    s_cvar = [result["stocks"][t][0] * 100 for t in result["stocks"]]
+    s_ret = [result["stocks"][t][1] * 100 for t in result["stocks"]]
+    s_labels = list(result["stocks"].keys())
+    fig.add_trace(go.Scatter(
+        x=s_cvar, y=s_ret,
+        mode="markers+text",
+        marker=dict(size=8, color="#64748B"),
+        text=s_labels,
+        textposition="top center",
+        textfont=dict(size=9, color="#64748B"),
+        name="Stocks",
+        hovertemplate="%{text}<br>CVaR: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>",
+    ))
+
+    # Current portfolio dot
+    fig.add_trace(go.Scatter(
+        x=[port_cvar * 100], y=[port_ret * 100],
+        mode="markers+text",
+        marker=dict(size=14, color="#F59E0B"),
+        text=["Your Portfolio"],
+        textposition="top center",
+        textfont=dict(size=10, color="#F59E0B", family="Inter, sans-serif"),
+        name="Portfolio",
+        hovertemplate="Your Portfolio<br>CVaR: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>",
+    ))
+
+    fig.update_layout(
+        template="plotly",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=380,
+        margin=dict(l=50, r=20, t=10, b=40),
+        xaxis=dict(
+            title="Tail Risk (CVaR %)",
+            gridcolor="rgba(255,255,255,0.04)",
+            tickfont=dict(color="#64748B", size=9),
+        ),
+        yaxis=dict(
+            title="Expected Return (%)",
+            gridcolor="rgba(255,255,255,0.04)",
+            tickfont=dict(color="#64748B", size=9),
+        ),
+        showlegend=False,
+        font=dict(family="Inter, sans-serif"),
+        hoverlabel=dict(
+            bgcolor="#1C1D26",
+            bordercolor="#1E293B",
+            font=dict(color="#F1F5F9", size=11, family="Inter, sans-serif"),
+        ),
+    )
+
+    with ui.column().classes("chart-card w-full"):
+        ui.html('<div class="section-label">Efficient Frontier</div>')
+        _section_intro(
+            "The optimal trade-off between tail risk (CVaR) and expected return. "
+            "If your portfolio dot is on the curve, your allocation is efficient. "
+            "If it is below the curve, you could improve your risk-adjusted return "
+            "by adjusting weights."
+        )
+        ui.plotly(fig).classes("w-full")
+
+
 # ── Sector Breakdown ────────────────────────────────────────────────────────
 
 _SECTOR_COLORS = [
@@ -1321,6 +1441,8 @@ async def build_health_tab(portfolio: dict, currency: str) -> None:
                 )
                 if len(tickers) >= 2:
                     _render_correlation_heatmap(price_data_1y, tickers)
+                if len(tickers) >= 3:
+                    _render_frontier_chart(price_data_1y, portfolio_df)
         ui.html(
             '<div class="touch-only" style="padding:12px 16px;font-size:12px;'
             f'color:{TEXT_DIM};background:{BG_PILL};border-radius:8px;'
