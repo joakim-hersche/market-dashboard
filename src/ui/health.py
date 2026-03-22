@@ -953,7 +953,6 @@ def _render_rebalancing_calculator(
             for _, row in ticker_data.iterrows()
         }
         deposit_ref = {"value": 0.0}
-        trade_pct_ref = {"value": 100}
         bar_containers: dict[str, ui.column] = {}
         footer_ref = {"ref": None}
 
@@ -966,7 +965,6 @@ def _render_rebalancing_calculator(
             if deposit > 0:
                 total_value = ticker_data["Total Value"].sum()
                 new_total = total_value + deposit
-                trade_budget = deposit * (trade_pct_ref["value"] / 100)
                 suggestions = []
                 for _, row in ticker_data.iterrows():
                     t = row["Ticker"]
@@ -981,7 +979,7 @@ def _render_rebalancing_calculator(
                     })
                 suggestions.sort(key=lambda s: s["Deficit"], reverse=True)
 
-                remaining = trade_budget
+                remaining = deposit
                 for s in suggestions:
                     if remaining <= 0 or s["Price"] is None or s["Price"] <= 0 or s["Deficit"] <= 0:
                         action_map[s["Ticker"]] = {"Shares": 0, "Amount": 0.0}
@@ -1134,15 +1132,6 @@ def _render_rebalancing_calculator(
                     _recalculate()
                 deposit_input.on_value_change(_on_deposit)
 
-                ui.html(f'<span style="font-size:11px;font-weight:600;color:{TEXT_MUTED};">Trade budget</span>')
-                trade_pct_input = ui.slider(min=10, max=100, value=100, step=10).props("label-always dense").style("width:100px;")
-                ui.html(f'<span style="font-size:10px;color:{TEXT_DIM};">%</span>')
-
-                def _on_trade_pct(e):
-                    trade_pct_ref["value"] = e.value or 100
-                    _recalculate()
-                trade_pct_input.on_value_change(_on_trade_pct)
-
             def _reset_targets():
                 for t, w in initial_weights.items():
                     target_weights[t] = w
@@ -1150,8 +1139,6 @@ def _render_rebalancing_calculator(
                         target_inputs[t].value = round(w)
                 deposit_ref["value"] = 0.0
                 deposit_input.value = 0
-                trade_pct_ref["value"] = 100
-                trade_pct_input.value = 100
                 _recalculate()
 
             ui.button("Reset", on_click=_reset_targets).props(
