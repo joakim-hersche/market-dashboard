@@ -88,11 +88,36 @@ No ranking or scoring — just data for your own comparison.
 
 - **Volatility** — how much the price swings day to day, expressed as a yearly percentage. Higher = more unpredictable.
 - **Worst Drop (Max Drawdown)** — the biggest peak-to-trough fall in the past year.
-- **Return/Risk Score (Sharpe Ratio)** — how much return you earn per unit of risk. Above 1 is good, above 2 is excellent.
-- **Market Sensitivity (Beta)** — how much the stock moves relative to the overall market (S&P 500).
+- **Return/Risk Score (Sharpe Ratio)** — how much return you earn per unit of risk. Uses the actual 10-year \
+government bond yield for your currency as the risk-free rate (not a fixed assumption). Above 1 is good, above 2 is excellent.
+- **Market Sensitivity (Beta)** — how much the stock moves relative to your local market benchmark \
+(S&P 500 for USD, SMI for CHF, Euro Stoxx 50 for EUR, FTSE 100 for GBP, OMX 30 for SEK).
 - **Correlation** — whether two stocks tend to go up and down together (close to 1.0) or move independently (close to 0).
 - **P/E Ratio** — how many years of current earnings you are paying for.
 - **Dividend Yield** — the annual dividend payment as a percentage of the stock price.""").classes("text-sm").style(f"color:{TEXT_SECONDARY}")
+
+        with ui.element("div").classes("chart-card w-full").style("overflow-x:auto;"):
+            ui.label("Risk-Free Rate Line").classes("text-lg font-bold").style(f"color:{TEXT_PRIMARY}")
+            ui.markdown("""The "Risk-free" toggle on the Portfolio Comparison chart shows what your money would have \
+earned in 10-year government bonds — the standard proxy for a risk-free return:
+
+| Currency | Bond used |
+|----------|-----------|
+| USD | US 10-Year Treasury |
+| EUR | German 10-Year Bund |
+| GBP | UK 10-Year Gilt |
+| CHF | Swiss 10-Year Confederation Bond |
+| SEK | Swedish 10-Year Government Bond |
+
+**Why the German Bund for EUR?** Germany has the highest credit rating in the eurozone, and the Bund is the \
+industry-standard risk-free benchmark for euro-denominated assets. Other eurozone countries (Italy, Spain, etc.) \
+carry additional credit risk, which means their higher yields are not truly "risk-free."
+
+The line compounds daily yields into a cumulative return, rebased to 100 like all other lines on the chart. \
+A flat or gently rising line means rates were low; a steeper climb means bonds were paying more.
+
+This feature requires a free FRED API key for USD (set `FRED_API_KEY` in your environment). EUR, GBP, CHF, and \
+SEK data is fetched from central bank APIs with no key required.""").classes("text-sm").style(f"color:{TEXT_SECONDARY}")
 
         with ui.element("div").classes("chart-card w-full").style("overflow-x:auto;"):
             ui.label("Monte Carlo Simulation (the Fan Charts)").classes("text-lg font-bold").style(f"color:{TEXT_PRIMARY}")
