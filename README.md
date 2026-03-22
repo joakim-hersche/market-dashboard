@@ -1,57 +1,89 @@
-# Market Dashboard
+# FX Portfolio
 
-A real-time stock portfolio tracker with Monte Carlo simulations, multi-currency support, and risk analytics. Built for European investors. Self-hostable.
+Real-time stock portfolio tracker with Monte Carlo simulations, multi-currency support, and risk analytics. Built for European investors.
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Try_it-green)](https://fxportfolio.app)
+[![Try It](https://img.shields.io/badge/Try_it-fxportfolio.app-green)](https://fxportfolio.app)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 
-![Market Dashboard](Screenshots/dark/01_overview_hero.png)
+![FX Portfolio](Screenshots/dark/01_overview_hero.png)
 
 ## Features
 
-Seven tabs covering the full portfolio workflow:
+- **Multi-currency** — USD, EUR, GBP, CHF, SEK with automatic FX conversion (including GBX handling for London-listed stocks)
+- **Monte Carlo simulation** — correlated multi-ticker paths with backtesting
+- **Dividend income tracking** — per-lot dividends from purchase date with historical FX rates
+- **Portfolio health scoring** — per-position risk flags, recommendations, and alerts
+- **Stock research** — peer comparison, analyst price targets, fundamentals
+- **Risk analytics** — volatility, Sharpe ratio, beta, max drawdown, correlation heatmap
+- **Rebalancing calculator** — buy-only rebalancing to target weights
+- **Excel report export** — formatted multi-sheet `.xlsx` with embedded charts and formulas
+- **Global coverage** — S&P 500, FTSE 100, DAX, CAC 40, SMI, AEX, IBEX 35, OMX 30, ETFs, crypto, commodities, REITs, bonds
+- **Contribution tracking** — cumulative cost basis vs portfolio market value over time
+- **Import / export** — save and load portfolios as JSON
+- **Encrypted storage** — portfolio data encrypted at rest, user authentication, mobile-responsive
+
+## Tabs
 
 ### Overview
+
 KPI cards (total value, daily P&L, total return, position count), allocation bar chart, and rebased performance chart with configurable time range and FX-adjusted toggle.
 
 ![Overview](Screenshots/dark/02_overview_full.png)
 
 ### Positions
+
 Multi-lot positions table with current price, total value, dividends, daily change, return %, analyst target prices, and portfolio weight. Per-ticker price history chart with buy-price overlay and purchase date markers.
 
 ![Positions](Screenshots/dark/03_positions_hero.png)
 
 ### Risk & Analytics
-Per-ticker volatility, max drawdown, Sharpe ratio, and beta vs S&P 500. Pairwise correlation heatmap. P/E ratio, dividend yield, 52-week range. Sector breakdown and buy-only rebalancing calculator.
+
+Per-ticker volatility, max drawdown, Sharpe ratio, and beta vs S&P 500. P/E ratio, dividend yield, 52-week range. Pairwise correlation heatmap. Sector breakdown and buy-only rebalancing calculator.
 
 ![Risk & Analytics](Screenshots/dark/04_risk_hero.png)
 
 ### Income
+
 Dividend income tracking with monthly breakdown by ticker, converted to your base currency at historical FX rates.
 
+![Income](Screenshots/dark/07_income.png)
+
 ### Forecast
+
 Monte Carlo simulation with correlated multi-ticker paths. Portfolio and per-ticker outlook with confidence bands, VaR/CVaR, and probability of breakeven. Backtesting against actual prices.
 
 ![Forecast](Screenshots/dark/05_forecast_hero.png)
 
 ### Diagnostics
+
 Model diagnostics testing normality (Jarque-Bera) and independence (Ljung-Box) of daily returns. QQ plots for visual inspection.
 
+![Diagnostics](Screenshots/dark/06_diagnostics_hero.png)
+
+### Research
+
+Stock screener with peer comparison, analyst price targets, and key fundamentals.
+
+![Research](Screenshots/dark/08_research.png)
+
+### Health
+
+Portfolio health score with per-position risk flags and actionable recommendations.
+
+![Health](Screenshots/dark/09_health.png)
+
 ### Guide
+
 In-app documentation explaining each tab and how to use the dashboard.
 
-### Key Features
+## Try It
 
-- **Multi-currency** — USD, EUR, GBP, CHF, SEK with automatic FX conversion (including GBX handling for London-listed stocks)
-- **Monte Carlo simulation** — correlated portfolio projections with backtesting
-- **Dividend income tracking** — per-lot dividends from purchase date with historical FX rates
-- **Contribution tracking** — cumulative cost basis vs portfolio market value over time
-- **Encrypted storage** — portfolio data encrypted at rest with Fernet (PBKDF2-derived key)
-- **Global stock coverage** — S&P 500, FTSE 100, DAX, CAC 40, SMI, AEX, IBEX 35, OMX 30, ETFs, crypto, commodities, REITs, bonds
-- **Excel report export** — formatted multi-sheet `.xlsx` with embedded charts, formulas, and net worth template
-- **Import / export** — save and load portfolios as JSON
+**[fxportfolio.app](https://fxportfolio.app)** — sign up free and add your positions.
 
 ## Quick Start
+
+Requires Python 3.12+.
 
 ### From source
 
@@ -67,13 +99,11 @@ Open http://localhost:8080
 ### Docker
 
 ```bash
-docker build -t market-dashboard .
-docker run -p 8080:8080 market-dashboard
+docker build -t fx-portfolio .
+docker run -p 8080:8080 fx-portfolio
 ```
 
-## Self-Hosting
-
-See [DEPLOY.md](DEPLOY.md) for deployment guides covering Fly.io, Oracle Cloud Free Tier, and Cloudflare setup.
+Self-hosted mode runs without auth/billing (local file storage).
 
 ## Tech Stack
 
@@ -84,38 +114,24 @@ See [DEPLOY.md](DEPLOY.md) for deployment guides covering Fly.io, Oracle Cloud F
 - [Plotly](https://plotly.com/python/) — interactive charts
 - [scipy](https://scipy.org) / [statsmodels](https://statsmodels.org) — statistical tests
 - [openpyxl](https://openpyxl.readthedocs.io) — Excel report generation
+- [PostgreSQL](https://www.postgresql.org) ([psycopg](https://www.psycopg.org)) — production database
+- [Stripe](https://stripe.com) — payment processing
+- [bcrypt](https://github.com/pyca/bcrypt) — password hashing
+- [resend](https://resend.com) — transactional email
 
 ## Project Structure
 
 ```
-market-dashboard/
-├── main.py                    # NiceGUI application entry point
-├── src/
-│   ├── cache.py               # TTL-based caching for API responses
-│   ├── charts.py              # Plotly chart builders
-│   ├── data_fetch.py          # yfinance wrappers with caching
-│   ├── excel_export.py        # Multi-sheet Excel generation
-│   ├── fx.py                  # FX rate fetching and currency detection
-│   ├── monte_carlo.py         # Simulation engine and backtest
-│   ├── portfolio.py           # Portfolio P&L calculations
-│   ├── stocks.py              # Stock list fetching
-│   ├── theme.py               # Design tokens and global CSS
-│   └── ui/
-│       ├── forecast.py        # Forecast and Diagnostics tabs
-│       ├── guide.py           # Guide tab
-│       ├── overview.py        # Overview tab and Excel export
-│       ├── positions.py       # Positions tab
-│       ├── risk.py            # Risk & Analytics tab
-│       ├── shared.py          # Shared UI utilities
-│       └── sidebar.py         # Sidebar and persistence
-├── data/
-│   └── sample_portfolio.json
-├── static/
-│   └── manifest.json          # PWA manifest
+fx-portfolio/
+├── main.py              # Application entry point
+├── src/                 # Core business logic (data fetching, calculations, charts, auth, billing)
+│   └── ui/              # All tab implementations
+├── static/              # PWA manifest and static assets
+├── data/                # Sample portfolio data
+├── tests/               # Test suite
 ├── Dockerfile
 ├── fly.toml
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
 
 ## Contributing
