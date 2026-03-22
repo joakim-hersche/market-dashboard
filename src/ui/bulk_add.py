@@ -103,17 +103,46 @@ def resolve_ticker(query: str) -> TickerMatch:
                 market=market,
             )
 
-    # Pass 2: fuzzy name search
+    # Pass 2: fuzzy name search — extract significant words from the query
+    # and check if they all appear in the label. This handles cases like
+    # "Exxon Mobil Corporation" matching "ExxonMobil (XOM)" and
+    # "Realty Income Corporation" matching "Realty Income (O)".
+    noise_words = {"inc", "inc.", "corp", "corp.", "corporation", "company",
+                   "the", "plc", "ltd", "limited", "holdings", "holding",
+                   "group", "sa", "ag", "se", "nv", "ord", "co", "co."}
+    query_words = [w for w in query_lower.split() if w not in noise_words
+                   and not w.startswith("$") and not w.startswith("(")]
+
     matches = []
     for market, tickers in options.items():
         for symbol, label in tickers.items():
-            if query_lower in label.lower() or query_lower in symbol.lower():
+            label_lower = label.lower()
+            sym_lower = symbol.lower()
+            # All significant query words must appear in label or symbol
+            if query_words and all(
+                w in label_lower or w in sym_lower for w in query_words
+            ):
                 matches.append({
                     "ticker": symbol,
                     "label": label,
                     "market": market,
                     "is_alt": market in _ALT_ASSET_LISTS,
                 })
+            # Also try original substring match for short queries like "AAPL"
+            elif query_lower in label_lower or query_lower in sym_lower:
+                matches.append({
+                    "ticker": symbol,
+                    "label": label,
+                    "market": market,
+                    "is_alt": market in _ALT_ASSET_LISTS,
+                })
+
+    # Deduplicate by ticker symbol (same stock in multiple lists)
+    seen = {}
+    for m in matches:
+        if m["ticker"] not in seen:
+            seen[m["ticker"]] = m
+    matches = list(seen.values())
 
     if len(matches) == 1:
         m = matches[0]
@@ -248,6 +277,18 @@ from src.theme import (
 from src.ui.shared import load_portfolio, save_portfolio
 
 _INITIAL_ROWS = 5
+
+# Shared column widths — used by BOTH header and body rows for alignment
+_COL = {
+    "num":      "min-width:28px; width:28px;",
+    "ticker":   "min-width:170px; width:170px;",
+    "confirm":  "min-width:200px; width:200px;",
+    "shares":   "min-width:80px; width:80px;",
+    "date":     "min-width:120px; width:120px;",
+    "date_cfm": "min-width:100px; width:100px;",
+    "price":    "min-width:100px; width:100px;",
+    "remove":   "min-width:36px; width:36px;",
+}
 
 # Shared styles
 _INPUT_STYLE = (
@@ -565,7 +606,7 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
     with row_el:
         # Row number
         ui.label(str(row.index)).style(
-            f"color:{TEXT_DIM}; font-size:13px; min-width:28px; text-align:left;"
+            f"color:{TEXT_DIM}; font-size:13px; {_COL['num']}"
         )
 
         # Ticker input — debounce=500 so on_change fires 500ms after user stops typing
@@ -577,12 +618,12 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
             ),
         ).props("dense borderless debounce=500"
         ).classes("bulk-ticker-input").style(
-            f"min-width:170px; {_INPUT_STYLE} padding:6px 10px;"
+            f"{_COL['ticker']} {_INPUT_STYLE} padding:6px 10px;"
         )
 
         # Confirm container
         confirm_container = ui.element("div").style(
-            "min-width:200px; display:flex; align-items:center; overflow:hidden;"
+            f"{_COL['confirm']} display:flex; align-items:center; overflow:hidden;"
         )
         row.ui_confirm_container = confirm_container
 
@@ -593,7 +634,7 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
             min=0.01,
             on_change=lambda e, r=row: _on_shares_change(r, e.value),
         ).props("dense borderless"
-        ).style(f"width:90px; {_INPUT_STYLE} padding:6px 10px;")
+        ).style(f"{_COL['shares']} {_INPUT_STYLE} padding:6px 10px;")
 
         # Date input — debounce=500 so on_change fires after user stops typing
         date_inp = ui.input(
@@ -603,24 +644,24 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
                 _on_date_change(r, e.value, base_currency)
             ),
         ).props("dense borderless debounce=500"
-        ).style(f"min-width:110px; {_INPUT_STYLE} padding:6px 10px;")
+        ).style(f"{_COL['date']} {_INPUT_STYLE} padding:6px 10px;")
 
         # Date confirm label
         date_confirm = ui.label("").style(
-            f"color:{TEXT_DIM}; font-size:12px; min-width:100px; white-space:nowrap;"
+            f"color:{TEXT_DIM}; font-size:12px; {_COL['date_cfm']} white-space:nowrap;"
         )
         row.ui_date_confirm = date_confirm
 
         # Price container
         price_container = ui.element("div").style(
-            "min-width:100px; display:flex; align-items:center; justify-content:flex-end;"
+            f"{_COL['price']} display:flex; align-items:center; justify-content:flex-end;"
         )
         row.ui_price_container = price_container
 
         # Remove button
         remove_div = ui.element("div").style(
-            f"cursor:pointer; color:{TEXT_MUTED}; font-size:15px; line-height:1;"
-            " padding:2px 4px; user-select:none;"
+            f"{_COL['remove']} cursor:pointer; color:{TEXT_MUTED}; font-size:15px;"
+            " line-height:1; text-align:center; user-select:none;"
         )
         remove_div.on(
             "click",
@@ -791,14 +832,14 @@ def open_bulk_add_dialog(portfolio: dict, base_currency: str, on_complete):
                 f" padding:12px 24px 8px 24px; gap:8px;"
                 f" border-bottom:1px solid {BORDER};"
             ):
-                ui.label("#").style(f"{_HEADER_CELL_STYLE} min-width:28px; text-align:left;")
-                ui.label("Ticker / Name").style(f"{_HEADER_CELL_STYLE} width:170px;")
-                ui.label("Confirmed Match").style(f"{_HEADER_CELL_STYLE} min-width:200px;")
-                ui.label("Shares").style(f"{_HEADER_CELL_STYLE} width:90px; text-align:right;")
-                ui.label("Purchase Date").style(f"{_HEADER_CELL_STYLE} width:110px;")
-                ui.label("Date Confirm").style(f"{_HEADER_CELL_STYLE} min-width:100px;")
-                ui.label("Price").style(f"{_HEADER_CELL_STYLE} min-width:100px; text-align:right;")
-                ui.label("").style(f"{_HEADER_CELL_STYLE} width:36px;")
+                ui.label("#").style(f"{_HEADER_CELL_STYLE} {_COL['num']}")
+                ui.label("Ticker / Name").style(f"{_HEADER_CELL_STYLE} {_COL['ticker']}")
+                ui.label("Confirmed Match").style(f"{_HEADER_CELL_STYLE} {_COL['confirm']}")
+                ui.label("Shares").style(f"{_HEADER_CELL_STYLE} {_COL['shares']}")
+                ui.label("Purchase Date").style(f"{_HEADER_CELL_STYLE} {_COL['date']}")
+                ui.label("Date Confirm").style(f"{_HEADER_CELL_STYLE} {_COL['date_cfm']}")
+                ui.label("Price").style(f"{_HEADER_CELL_STYLE} {_COL['price']}")
+                ui.label("").style(f"{_HEADER_CELL_STYLE} {_COL['remove']}")
 
             # ── Table body ──
             table_body = ui.column().classes("w-full").style(
@@ -851,6 +892,7 @@ def open_bulk_add_dialog(portfolio: dict, base_currency: str, on_complete):
         paste_bridge_id = f"c{paste_bridge.id}"
 
         ui.run_javascript(f"""
+            // Paste handler — intercept multi-line paste in ticker inputs
             document.addEventListener('paste', function(e) {{
                 const active = document.activeElement;
                 if (active && active.closest('.bulk-ticker-input')) {{
@@ -862,6 +904,31 @@ def open_bulk_add_dialog(portfolio: dict, base_currency: str, on_complete):
                             bridge.setAttribute('data-paste', text);
                             bridge.dispatchEvent(new Event('paste_bulk'));
                         }}
+                    }}
+                }}
+            }});
+            // Enter key = move down to same column in next row (like Excel)
+            document.addEventListener('keydown', function(e) {{
+                if (e.key !== 'Enter') return;
+                const active = document.activeElement;
+                if (!active || !active.closest('.q-dialog')) return;
+                const input = active.closest('.q-field');
+                if (!input) return;
+                e.preventDefault();
+                // Find current row and column index
+                const row = input.closest('.q-row, [class*="row"]');
+                if (!row) return;
+                const fields = Array.from(row.querySelectorAll('.q-field'));
+                const colIdx = fields.indexOf(input);
+                // Find next row
+                const allRows = row.parentElement.children;
+                const rowIdx = Array.from(allRows).indexOf(row);
+                const nextRow = allRows[rowIdx + 1];
+                if (nextRow) {{
+                    const nextFields = nextRow.querySelectorAll('.q-field');
+                    if (nextFields[colIdx]) {{
+                        const nextInput = nextFields[colIdx].querySelector('input');
+                        if (nextInput) nextInput.focus();
                     }}
                 }}
             }});
