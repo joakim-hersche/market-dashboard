@@ -98,6 +98,7 @@ def build_sidebar(
     search_select = ui.select(
         options=all_tickers,
         with_input=True,
+        new_value_mode="add-unique",
         label="Search ticker...",
     ).props(
         'dense outlined use-input clearable input-debounce="150" '
@@ -108,7 +109,7 @@ def build_sidebar(
 
     search_select.add_slot(
         "no-option",
-        f'<div style="padding:8px 12px;font-size:11px;color:{TEXT_DIM};">No matching tickers found</div>'
+        f'<div style="padding:8px 12px;font-size:11px;color:{TEXT_DIM};">Press Enter to use this ticker</div>'
     )
     search_select.add_slot(
         "prepend",
@@ -203,9 +204,14 @@ def build_sidebar(
     def _on_ticker_change(e):
         ticker = e.value
         if ticker and _is_valid_ticker(ticker):
+            # Normalize custom-typed tickers to uppercase
+            if ticker != ticker.upper():
+                ticker = ticker.upper()
+                search_select.set_value(ticker)
+                return  # will re-trigger this handler
             detail_container.set_visibility(True)
             market = _infer_market(ticker)
-            market_label = market.split(" — ")[0] if market else "US"
+            market_label = market.split(" — ")[0] if market else "Custom"
             company = all_tickers.get(ticker, ticker)
             is_alt = market in _ALT_ASSETS if market else False
             ticker_info.content = (
@@ -265,9 +271,11 @@ def build_sidebar(
             return
 
         if ticker not in all_tickers:
+            notification = ui.notification(f"Verifying {ticker}...", spinner=True, timeout=None)
             valid = await _validate_ticker(ticker)
+            notification.dismiss()
             if not valid:
-                ui.notify("Ticker not found — check the symbol and try again", type="warning")
+                ui.notify(f"'{ticker}' not found on Yahoo Finance. Check the symbol (e.g., ALV.DE for Allianz).", type="negative")
                 return
 
         market = _infer_market(ticker)
