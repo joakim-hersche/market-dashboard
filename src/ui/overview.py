@@ -590,6 +590,7 @@ async def build_comparison(
         selected_range = range_options[range_label]
         fx_adjust = fx_switch.value
         show_bench = bench_switch.value
+        show_rf = rf_switch.value
 
         def _fetch_comparison_data():
             from concurrent.futures import ThreadPoolExecutor
@@ -656,7 +657,7 @@ async def build_comparison(
             # Fetch risk-free yield curve if requested
             rf_cumulative = None
             rf_label = None
-            if rf_switch.value:
+            if show_rf:
                 rf_label = f"Risk-Free ({risk_free_label(base_currency)})"
                 try:
                     all_series = [s for s in data.values() if s is not None and not s.empty]
@@ -697,7 +698,7 @@ async def build_comparison(
             ))
 
         # Add risk-free rate overlay
-        if rf_switch.value and rf_cumulative is not None and not rf_cumulative.empty:
+        if show_rf and rf_cumulative is not None and not rf_cumulative.empty:
             import plotly.graph_objects as go
             fig.add_trace(go.Scatter(
                 x=rf_cumulative.index, y=rf_cumulative.values,
