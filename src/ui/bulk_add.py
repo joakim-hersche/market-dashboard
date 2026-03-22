@@ -379,8 +379,8 @@ def _update_price_cell(row: BulkRow):
                 value=None,
                 min=0.01,
                 on_change=lambda e, r=row: _on_manual_price(r, e.value),
-            ).props("dense borderless input-style='padding:6px 10px;font-size:13px;text-align:right'"
-            ).style(f"width:100px; {_INPUT_STYLE}")
+            ).props("dense borderless"
+            ).style(f"width:100px; {_INPUT_STYLE} padding:6px 10px;")
             row.manual_price = True
 
 
@@ -486,6 +486,7 @@ async def _on_ticker_change(row: BulkRow, value: str, base_currency: str):
         return
 
     row.reset_resolution()
+    row._cancelled = False  # allow THIS call's result to land
     row.ticker_input = value
     _update_confirm_cell(row)  # clear while resolving
 
@@ -567,17 +568,16 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
             f"color:{TEXT_DIM}; font-size:13px; min-width:28px; text-align:left;"
         )
 
-        # Ticker input — use on_value_change (fires when value syncs to Python)
-        # then trigger resolution after a short debounce
+        # Ticker input — debounce=500 so on_change fires 500ms after user stops typing
         ticker_inp = ui.input(
             placeholder="Type or paste...",
             value=row.ticker_input,
             on_change=lambda e, r=row: asyncio.ensure_future(
                 _on_ticker_change(r, e.value, base_currency)
             ),
-        ).props("dense borderless input-style='padding:6px 10px;font-size:13px'"
+        ).props("dense borderless debounce=500"
         ).classes("bulk-ticker-input").style(
-            f"min-width:160px; {_INPUT_STYLE}"
+            f"min-width:160px; {_INPUT_STYLE} padding:6px 10px;"
         )
 
         # Confirm container
@@ -592,18 +592,18 @@ def _render_row(row: BulkRow, rows: list[BulkRow], base_currency: str,
             value=row.shares if row.shares else None,
             min=0.01,
             on_change=lambda e, r=row: _on_shares_change(r, e.value),
-        ).props("dense borderless input-style='padding:6px 10px;font-size:13px;text-align:right'"
-        ).style(f"width:90px; {_INPUT_STYLE}")
+        ).props("dense borderless"
+        ).style(f"width:90px; {_INPUT_STYLE} padding:6px 10px;")
 
-        # Date input — on_change fires when value syncs
+        # Date input — debounce=500 so on_change fires after user stops typing
         date_inp = ui.input(
             placeholder="DD/MM/YYYY",
             value=row.date_input,
             on_change=lambda e, r=row: asyncio.ensure_future(
                 _on_date_change(r, e.value, base_currency)
             ),
-        ).props("dense borderless input-style='padding:6px 10px;font-size:13px'"
-        ).style(f"min-width:110px; {_INPUT_STYLE}")
+        ).props("dense borderless debounce=500"
+        ).style(f"min-width:110px; {_INPUT_STYLE} padding:6px 10px;")
 
         # Date confirm label
         date_confirm = ui.label("").style(
