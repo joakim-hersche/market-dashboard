@@ -232,7 +232,7 @@ def build_portfolio_df(portfolio: dict, base_currency: str) -> pd.DataFrame:
                 if purchase_date and purchase_date != "Manual"
                 else 0.0
             )
-            total_dividends = round(dividends_per_share * shares, 2)
+            total_dividends = round(dividends_per_share * adjusted_shares, 2)
             cost_basis = buy_price * shares  # what you paid — independent of splits
 
             rows.append({
@@ -439,7 +439,8 @@ def build_dividend_timeline(
 
                 # Only count shares from lots purchased on or before this dividend date
                 shares_held = sum(
-                    lot["shares"] for lot in lots
+                    lot["shares"] * get_split_factor(ticker, lot.get("purchase_date"))
+                    for lot in lots
                     if lot.get("purchase_date") and lot["purchase_date"] <= date_str
                 )
                 if shares_held <= 0:
