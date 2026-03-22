@@ -109,7 +109,9 @@ def resolve_ticker(query: str) -> TickerMatch:
     # "Realty Income Corporation" matching "Realty Income (O)".
     noise_words = {"inc", "inc.", "corp", "corp.", "corporation", "company",
                    "the", "plc", "ltd", "limited", "holdings", "holding",
-                   "group", "sa", "ag", "se", "nv", "ord", "co", "co."}
+                   "group", "sa", "ag", "se", "nv", "ord", "co", "co.",
+                   "shares", "fund", "trust", "etf", "spdr", "ishares",
+                   "vanguard", "class", "a", "b", "i", "ii"}
     query_words = [w for w in query_lower.split() if w not in noise_words
                    and not w.startswith("$") and not w.startswith("(")]
 
@@ -118,10 +120,9 @@ def resolve_ticker(query: str) -> TickerMatch:
         for symbol, label in tickers.items():
             label_lower = label.lower()
             sym_lower = symbol.lower()
+            combined = label_lower + " " + sym_lower
             # All significant query words must appear in label or symbol
-            if query_words and all(
-                w in label_lower or w in sym_lower for w in query_words
-            ):
+            if query_words and all(w in combined for w in query_words):
                 matches.append({
                     "ticker": symbol,
                     "label": label,
@@ -136,6 +137,27 @@ def resolve_ticker(query: str) -> TickerMatch:
                     "market": market,
                     "is_alt": market in _ALT_ASSET_LISTS,
                 })
+
+    # If strict all-words match found nothing, try partial: at least 2 words
+    # match AND those words cover >50% of query. Handles "SPDR Gold Shares"
+    # matching "Gold ETF (GLD)" via "gold".
+    if not matches and len(query_words) >= 2:
+        scored = []
+        for market, tickers in options.items():
+            for symbol, label in tickers.items():
+                combined = label.lower() + " " + symbol.lower()
+                hits = sum(1 for w in query_words if w in combined)
+                if hits >= 2 or (hits >= 1 and hits / len(query_words) >= 0.5):
+                    scored.append((hits, {
+                        "ticker": symbol,
+                        "label": label,
+                        "market": market,
+                        "is_alt": market in _ALT_ASSET_LISTS,
+                    }))
+        if scored:
+            scored.sort(key=lambda x: x[0], reverse=True)
+            best_score = scored[0][0]
+            matches = [m for s, m in scored if s == best_score]
 
     # Deduplicate by ticker symbol (same stock in multiple lists)
     seen = {}
