@@ -66,6 +66,10 @@ def compute_analytics(
         excess = daily_returns - daily_rf
         sharpe = float((excess.mean() / excess.std()) * (252 ** 0.5)) if excess.std() > 0 else None
 
+        # Sortino ratio (annualised, penalises only downside volatility)
+        downside = excess[excess < 0]
+        sortino = float((excess.mean() / downside.std()) * (252 ** 0.5)) if len(downside) > 5 and downside.std() > 0 else None
+
         # Beta vs currency-specific benchmark
         beta = None
         if not bench_returns.empty:
@@ -75,11 +79,12 @@ def compute_analytics(
                 beta = float(aligned["stock"].cov(aligned["bench"]) / aligned["bench"].var())
 
         rows.append({
-            "Ticker":       ticker,
-            "Volatility":   round(volatility * 100, 1),
-            "Max Drawdown": round(max_drawdown * 100, 1),
-            "Sharpe Ratio": round(sharpe, 2) if sharpe is not None else None,
-            "Beta":         round(beta, 2) if beta is not None else None,
+            "Ticker":        ticker,
+            "Volatility":    round(volatility * 100, 1),
+            "Max Drawdown":  round(max_drawdown * 100, 1),
+            "Sharpe Ratio":  round(sharpe, 2) if sharpe is not None else None,
+            "Sortino Ratio": round(sortino, 2) if sortino is not None else None,
+            "Beta":          round(beta, 2) if beta is not None else None,
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
