@@ -122,6 +122,21 @@ This feature requires a free FRED API key for USD (set `FRED_API_KEY` in your en
 SEK data is fetched from central bank APIs with no key required.""").classes("text-sm").style(f"color:{TEXT_SECONDARY}")
 
         with ui.element("div").classes("chart-card w-full").style("overflow-x:auto;"):
+            ui.label("Efficient Frontier").classes("text-lg font-bold").style(f"color:{TEXT_PRIMARY}")
+            ui.markdown("""The efficient frontier chart shows the optimal trade-off between risk and return \
+for your portfolio's stocks. The curve represents the best possible portfolios: maximum return for each level \
+of tail risk (CVaR).
+
+If your portfolio dot is on the curve, your allocation is optimal. If it is below the curve, you could get more \
+return for the same risk, or less risk for the same return, by adjusting your weights.
+
+Individual stock dots show where each holding sits on its own. Stocks above the curve are outperforming on a \
+risk-adjusted basis; stocks below are underperforming.
+
+This analysis uses Mean-CVaR optimisation — the same framework used by institutional investors to build \
+portfolios that minimise tail risk (the worst-case losses) rather than just average volatility.""").classes("text-sm").style(f"color:{TEXT_SECONDARY}")
+
+        with ui.element("div").classes("chart-card w-full").style("overflow-x:auto;"):
             ui.label("Monte Carlo Simulation (the Fan Charts)").classes("text-lg font-bold").style(f"color:{TEXT_PRIMARY}")
             ui.markdown("""Imagine replaying the stock market 1,000 times. Each replay uses the stock's real historical \
 behaviour — how much it typically moves each day — but shuffles the order of good and bad days randomly. \
