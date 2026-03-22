@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src import db
@@ -37,7 +38,7 @@ FREE_POSITION_LIMIT = 10
 
 
 def is_pro(user_id: str | None) -> bool:
-    """Check if a user has Pro access."""
+    """Check if a user has Pro access. Lazy-downgrades expired promos."""
     if os.environ.get("TESTING_MODE", "").lower() == "true":
         return True
     if not user_id:
@@ -45,12 +46,41 @@ def is_pro(user_id: str | None) -> bool:
     user = db.get_user_by_id(user_id)
     if not user:
         return False
-    return user.get("tier") == "pro"
+    if user.get("tier") != "pro":
+        return False
+    expires = user.get("pro_expires_at")
+    if expires is None:
+        return True  # Stripe Pro — no expiry
+    if isinstance(expires, str):
+        expires = datetime.fromisoformat(expires)
+    if datetime.now(timezone.utc) < expires:
+        return True  # Promo still active
+    # Promo expired — lazy downgrade (keep pro_expires_at as re-use evidence)
+    db.set_tier(user_id, "free")
+    return False
 
 
 def is_tab_locked(tab_name: str) -> bool:
     """Check if a tab is in the locked set (requires Pro)."""
     return tab_name in _LOCKED_TABS
+
+
+# ── Promo codes ──────────────────────────────────────────
+
+
+def apply_promo_code(user_id: str, code: str) -> str:
+    """Apply a promo code. Returns 'ok', 'invalid', or 'already_used'."""
+    expected = os.environ.get("PROMO_CODE", "")
+    if not expected or code.strip().upper() != expected.strip().upper():
+        return "invalid"
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return "invalid"
+    if user.get("pro_expires_at") is not None:
+        return "already_used"
+    db.set_tier(user_id, "pro")
+    db.set_pro_expires(user_id, datetime.now(timezone.utc) + timedelta(days=30))
+    return "ok"
 
 
 # ── Display prices ────────────────────────────────────────
@@ -125,6 +155,7 @@ def handle_checkout_completed(user_id: str, customer_id: str, subscription_id: s
     """Handle successful checkout — upgrade user to Pro."""
     db.set_tier(user_id, "pro")
     db.set_stripe_ids(user_id, customer_id, subscription_id)
+    db.set_pro_expires(user_id, None)  # Clear any promo expiry
 
 
 def handle_subscription_deleted(customer_id: str) -> None:

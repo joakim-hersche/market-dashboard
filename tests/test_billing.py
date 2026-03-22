@@ -110,3 +110,85 @@ def test_display_prices_chf(monkeypatch):
     prices = billing.get_display_prices("CHF")
     assert prices["monthly"] == 8
     assert prices["symbol"] == "CHF"
+
+
+from datetime import datetime, timedelta, timezone
+
+
+# ── promo codes ──
+
+
+def test_apply_promo_code_valid(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("promo@example.com", "hash", b"key")
+    result = billing.apply_promo_code(user_id, "LAUNCH2026")
+    assert result == "ok"
+    assert billing.is_pro(user_id) is True
+
+
+def test_apply_promo_code_case_insensitive(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("promo2@example.com", "hash", b"key")
+    result = billing.apply_promo_code(user_id, "launch2026")
+    assert result == "ok"
+    assert billing.is_pro(user_id) is True
+
+
+def test_apply_promo_code_invalid(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("bad@example.com", "hash", b"key")
+    result = billing.apply_promo_code(user_id, "WRONG")
+    assert result == "invalid"
+    assert billing.is_pro(user_id) is False
+
+
+def test_apply_promo_code_no_code_configured():
+    user_id = db.create_user("nocode@example.com", "hash", b"key")
+    result = billing.apply_promo_code(user_id, "ANYTHING")
+    assert result == "invalid"
+
+
+def test_apply_promo_code_reuse_blocked(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("reuse@example.com", "hash", b"key")
+    billing.apply_promo_code(user_id, "LAUNCH2026")
+    # Simulate natural expiry via is_pro() lazy downgrade
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    db.set_pro_expires(user_id, past)
+    assert billing.is_pro(user_id) is False  # triggers lazy downgrade
+    # Try to reuse — should be blocked (pro_expires_at still set as evidence)
+    result = billing.apply_promo_code(user_id, "LAUNCH2026")
+    assert result == "already_used"
+
+
+def test_is_pro_promo_active(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("active@example.com", "hash", b"key")
+    billing.apply_promo_code(user_id, "LAUNCH2026")
+    assert billing.is_pro(user_id) is True
+
+
+def test_is_pro_promo_expired(monkeypatch):
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("expired@example.com", "hash", b"key")
+    billing.apply_promo_code(user_id, "LAUNCH2026")
+    # Set expiry to the past
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    db.set_pro_expires(user_id, past)
+    assert billing.is_pro(user_id) is False
+    # Verify tier was downgraded but pro_expires_at kept as evidence
+    user = db.get_user_by_id(user_id)
+    assert user["tier"] == "free"
+    assert user["pro_expires_at"] is not None  # kept for re-use prevention
+
+
+def test_checkout_clears_promo_expiry(monkeypatch):
+    """Stripe checkout should clear promo expiry so paid users aren't affected."""
+    monkeypatch.setenv("PROMO_CODE", "LAUNCH2026")
+    user_id = db.create_user("convert@example.com", "hash", b"key")
+    billing.apply_promo_code(user_id, "LAUNCH2026")
+    # User converts to paid
+    billing.handle_checkout_completed(user_id, "cus_conv", "sub_conv")
+    user = db.get_user_by_id(user_id)
+    assert user["tier"] == "pro"
+    assert user["pro_expires_at"] is None  # Cleared
