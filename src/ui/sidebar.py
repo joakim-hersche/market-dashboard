@@ -18,6 +18,7 @@ from src.theme import (
     TEXT_DIM, TEXT_MUTED, TEXT_PRIMARY,
 )
 from src.billing import FREE_POSITION_LIMIT, is_pro
+from src.ui.bulk_add import open_bulk_add_dialog
 from src.ui.shared import load_portfolio, save_portfolio
 
 # ── Sample portfolio path ──
@@ -904,6 +905,13 @@ def build_sidebar(
             on_click=on_load_sample,
         ).props('flat no-caps').classes("w-full").style(_action_btn_style)
         _sample_btn.props('id="btn-load-sample"')
+
+        ui.button(
+            "Bulk Add", icon="playlist_add",
+            on_click=lambda: open_bulk_add_dialog(
+                portfolio, shared["currency"], positions_list.refresh,
+            ),
+        ).props('flat no-caps').classes("w-full").style(_action_btn_style)
 
         ui.button(
             "Clear All", icon="delete_outline",
