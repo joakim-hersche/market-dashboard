@@ -448,6 +448,8 @@ def _render_price_chart(ticker: str, hist: pd.DataFrame) -> None:
         return
 
     close = hist["Close"].dropna()
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
     if close.empty:
         return
 
@@ -691,6 +693,8 @@ async def build_research_tab(
             return_1y = None
             if not hist.empty and "Close" in hist.columns:
                 close = hist["Close"].dropna()
+                if isinstance(close, pd.DataFrame):
+                    close = close.iloc[:, 0]
                 if len(close) >= 2:
                     return_1y = round(
                         (close.iloc[-1] / close.iloc[0] - 1) * 100, 1
