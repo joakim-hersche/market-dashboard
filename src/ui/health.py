@@ -499,7 +499,7 @@ def _render_flat_table(
               <tr>
                 <th rowspan="2">Ticker</th>
                 <th colspan="4" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.07);">Performance</th>
-                <th colspan="4" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.07);border-left:1px solid rgba(255,255,255,0.07);">Risk</th>
+                <th colspan="5" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.07);border-left:1px solid rgba(255,255,255,0.07);">Risk</th>
                 <th colspan="4" style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.07);border-left:1px solid rgba(255,255,255,0.07);">Valuation</th>
               </tr>
               <tr>
@@ -510,6 +510,7 @@ def _render_flat_table(
                 <th class="right th-tip" style="border-left:1px solid rgba(255,255,255,0.07);" title="How much the price swings day to day, as a yearly %. Higher = more unpredictable.">Volatility</th>
                 <th class="right th-tip" title="Biggest peak-to-trough fall in the past year. Shows the worst losing streak.">Worst Drop</th>
                 <th class="right th-tip" title="Return per unit of risk (Sharpe Ratio). Above 1 is good, above 2 is excellent, below 0 means you lost money.">Return/Risk</th>
+                <th class="right th-tip" title="Like Sharpe but only penalises downside swings. A stock that rises a lot but rarely falls will score higher here than on Sharpe.">Downside R/R</th>
                 <th class="right th-tip" title="How much this stock moves relative to the S&amp;P 500. 1.0 = same swings, above 1 = more volatile, below 1 = calmer.">Beta</th>
                 <th class="right th-tip" style="border-left:1px solid rgba(255,255,255,0.07);" title="Price-to-Earnings ratio. How many years of current profits you pay for the stock. Lower can mean cheaper, higher can mean expected growth.">P/E Ratio</th>
                 <th class="right th-tip" title="Annual dividend payment as a % of the stock price. Higher = more cash income from holding.">Div Yield</th>

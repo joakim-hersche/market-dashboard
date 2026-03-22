@@ -90,6 +90,8 @@ No ranking or scoring — just data for your own comparison.
 - **Worst Drop (Max Drawdown)** — the biggest peak-to-trough fall in the past year.
 - **Return/Risk Score (Sharpe Ratio)** — how much return you earn per unit of risk. Uses the actual 10-year \
 government bond yield for your currency as the risk-free rate (not a fixed assumption). Above 1 is good, above 2 is excellent.
+- **Downside Return/Risk (Sortino Ratio)** — like the Sharpe ratio but only penalises downside volatility. \
+A stock that swings up a lot but rarely drops will have a higher Sortino than Sharpe. Above 1 is good, above 2 is excellent.
 - **Market Sensitivity (Beta)** — how much the stock moves relative to your local market benchmark \
 (S&P 500 for USD, SMI for CHF, Euro Stoxx 50 for EUR, FTSE 100 for GBP, OMX 30 for SEK).
 - **Correlation** — whether two stocks tend to go up and down together (close to 1.0) or move independently (close to 0).
