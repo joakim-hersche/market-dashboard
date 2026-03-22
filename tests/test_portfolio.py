@@ -96,7 +96,7 @@ def test_get_split_factor_cumulative(mock_ticker_cls):
     # Simulate a 4:1 split on 2024-06-01 and a 2:1 split on 2024-09-01
     splits = pd.Series(
         [4.0, 2.0],
-        index=pd.DatetimeIndex(["2024-06-01", "2024-09-01"]),
+        index=pd.DatetimeIndex(["2024-06-01", "2024-09-01"]).tz_localize("America/New_York"),
     )
     mock_ticker_cls.return_value.splits = splits
 
