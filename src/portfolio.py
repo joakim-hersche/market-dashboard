@@ -145,7 +145,7 @@ def get_split_factor(ticker: str, purchase_date: str) -> float:
         splits = yf.Ticker(ticker).splits
         if splits.empty:
             return 1.0
-        after = splits[splits.index > pd.Timestamp(purchase_date)]
+        after = splits[splits.index.tz_localize(None) > pd.Timestamp(purchase_date)]
         if after.empty:
             return 1.0
         return float(after.prod())
