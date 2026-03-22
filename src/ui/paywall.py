@@ -164,6 +164,10 @@ def build_pricing_page(user_id: str | None, currency: str) -> None:
                             "no-caps unelevated"
                         ).style(f"width:100%; background:{ACCENT}; border-radius:8px;")
 
+        ui.label("Have a promo code? You can apply it during checkout.").style(
+            f"font-size:12px; color:{TEXT_DIM}; margin-top:16px;"
+        )
+
 
 def _feature_list(features: list[tuple[str, bool]]) -> None:
     """Render a feature checklist."""

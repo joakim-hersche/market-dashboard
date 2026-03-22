@@ -131,6 +131,7 @@ def create_checkout_session(user_id: str, email: str, currency: str, interval: s
         mode=mode,
         success_url=f"{app_url}/?upgraded=1",
         cancel_url=f"{app_url}/pricing",
+        allow_promotion_codes=True,
     )
     return session.url
 
