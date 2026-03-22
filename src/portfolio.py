@@ -235,6 +235,7 @@ def build_portfolio_df(portfolio: dict, base_currency: str) -> pd.DataFrame:
                 "Purchase": i + 1,
                 "Shares": adjusted_shares,
                 "Buy Price": round(buy_price, 2),
+                "Cost Basis": round(cost_basis, 2),
                 "Purchase Date": purchase_date or "Manual",
                 "Current Price": round(current_price, 2),
                 "Total Value": round(current_price * adjusted_shares, 2),
@@ -433,8 +434,7 @@ def build_dividend_timeline(
 
                 # Only count shares from lots purchased on or before this dividend date
                 shares_held = sum(
-                    lot["shares"] * get_split_factor(ticker, lot.get("purchase_date"))
-                    for lot in lots
+                    lot["shares"] for lot in lots
                     if lot.get("purchase_date") and lot["purchase_date"] <= date_str
                 )
                 if shares_held <= 0:
