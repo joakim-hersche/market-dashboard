@@ -7,6 +7,7 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
 from openpyxl.formatting.rule import ColorScaleRule, CellIsRule
+from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -367,6 +368,10 @@ def _sheet_summary(wb: Workbook, kpis: dict, currency: str, n_rows: int) -> None
         ("Max Drawdown (portfolio)", kpis.get("portfolio_max_dd"),  '0.0"%"'),
         ("Annualized Volatility",    kpis.get("portfolio_vol"),     '0.0"%"'),
     ]
+    _summary_risk_comment = (
+        f"Computed by script on {datetime.now().strftime('%d %B %Y')}. "
+        "Source: historical price data (yfinance). Re-run script to refresh."
+    )
     for idx, (label, value, fmt) in enumerate(risk_rows, risk_start + 1):
         lbl_cell           = ws.cell(idx, 1, label)
         lbl_cell.font      = Font(size=10)
@@ -378,6 +383,8 @@ def _sheet_summary(wb: Workbook, kpis: dict, currency: str, n_rows: int) -> None
         val_cell.alignment     = Alignment(horizontal="right", vertical="center")
         val_cell.border        = _CELL_BORDER
         val_cell.font          = Font(size=10)
+        if value is not None:
+            val_cell.comment = Comment(_summary_risk_comment, "Portfolio Report")
 
         if idx % 2 == 0:
             ws.cell(idx, 1).fill = _ALT_FILL
@@ -497,10 +504,15 @@ def _sheet_positions(wb: Workbook, df: pd.DataFrame, name_map: dict, currency: s
                 )
                 cell.number_format = '0.00"%"'
                 cell.font          = Font(size=10)
+            elif col_name == "Cost Basis":
+                # Formula so Cost Basis stays live if Shares or Buy Price inputs change
+                cell.value         = f"={D}{row_idx}*{E}{row_idx}"
+                cell.number_format = curr_fmt
+                cell.font          = Font(size=10)
             else:
                 cell.value = safe
                 cell.font  = Font(size=10)
-                if col_name in {"Buy Price", "Dividends", "Daily P&L", "Cost Basis"}:
+                if col_name in {"Buy Price", "Dividends", "Daily P&L"}:
                     cell.number_format = curr_fmt
                 elif col_name == "Shares":
                     cell.number_format = "#,##0"
@@ -640,6 +652,10 @@ def _sheet_risk(wb: Workbook, analytics_df: pd.DataFrame, name_map: dict, positi
         if col_name == "Sharpe Ratio":
             sharpe_col = get_column_letter(col_idx)
 
+    _risk_comment_text = (
+        f"Computed by script on {datetime.now().strftime('%d %B %Y')}. "
+        "Source: historical price data (yfinance). Re-run script to refresh."
+    )
     for row_idx, row in enumerate(export_df.itertuples(index=False), 2):
         alt = _row_fill(row_idx)
         for col_idx, (col_name, value) in enumerate(zip(export_df.columns, row), 1):
@@ -650,8 +666,10 @@ def _sheet_risk(wb: Workbook, analytics_df: pd.DataFrame, name_map: dict, positi
                 cell.fill = alt
             if col_name in ("Volatility (%)", "Max Drawdown (%)") and isinstance(value, (int, float)):
                 cell.number_format = '0.0"%"'
+                cell.comment = Comment(_risk_comment_text, "Portfolio Report")
             elif col_name in ("Sharpe Ratio", "Beta") and isinstance(value, (int, float)):
                 cell.number_format = "0.00"
+                cell.comment = Comment(_risk_comment_text, "Portfolio Report")
         ws.row_dimensions[row_idx].height = 18
 
     # Portfolio weighted-average row — uses SUMPRODUCT formulas linked to Allocation weights
@@ -762,12 +780,18 @@ def _sheet_attribution(wb: Workbook, positions_df: pd.DataFrame, name_map: dict)
         alt = _row_fill(row_idx)
         values = [ticker, name_map.get(ticker, ""), row["weight"], row["return_pct"], row["contribution"]]
         for col_idx, (col_name, value) in enumerate(zip(headers, values), 1):
-            cell        = ws.cell(row_idx, col_idx, round(value, 2) if isinstance(value, float) else value)
+            if col_name == "Contribution (%)":
+                # Formula: (Weight% / 100) * (Return% / 100) * 100 = Weight% * Return% / 100
+                cell = ws.cell(row_idx, col_idx, f"=C{row_idx}/100*D{row_idx}/100*100")
+            else:
+                cell = ws.cell(row_idx, col_idx, round(value, 2) if isinstance(value, float) else value)
             cell.border = _CELL_BORDER
             cell.font   = Font(size=10)
             if alt:
                 cell.fill = alt
             if col_name in ("Weight (%)", "Return (%)", "Contribution (%)") and isinstance(value, (int, float)):
+                cell.number_format = '0.00"%"'
+            if col_name == "Contribution (%)":
                 cell.number_format = '0.00"%"'
 
     # Total row
@@ -1263,9 +1287,10 @@ def _sheet_currency_exposure(wb: Workbook, positions_df: pd.DataFrame, name_map:
     _add_table(ws, "tblCurrencyExp", f"A3:E{last_data}")
 
     # Totals row — outside the table
+    # Use =Summary!B5 so the total matches the portfolio value exactly (no FX rounding gap)
     totals_row = last_data + 1
     ws.cell(totals_row, 1, "TOTAL").font = _TOTAL_FONT
-    ws.cell(totals_row, 2, round(total_value, 2)).number_format = curr_fmt
+    ws.cell(totals_row, 2, "=Summary!B5").number_format = curr_fmt
     ws.cell(totals_row, 2).font = _TOTAL_FONT
     ws.cell(totals_row, 3, 100.0).number_format = '0.0"%"'
     ws.cell(totals_row, 3).font = _TOTAL_FONT
@@ -1664,7 +1689,8 @@ def _sheet_scenario(wb: Workbook, positions_df: pd.DataFrame, name_map: dict, cu
     banner.value     = (
         "Scenario Analysis  —  edit Target Price (blue cells) to model portfolio impact. "
         "All other columns update automatically. "
-        "Projected Return (%) measures return from average cost basis to target price (not from current price)."
+        "Projected Price Return (%) measures price-only return from average cost basis to target price "
+        "(excludes dividends; see Positions sheet Return % for total return including dividends)."
     )
     banner.font      = Font(italic=True, size=10, color="BFCDE0")
     banner.fill      = PatternFill("solid", fgColor=_C_NAVY_DARK)
@@ -1675,7 +1701,7 @@ def _sheet_scenario(wb: Workbook, positions_df: pd.DataFrame, name_map: dict, cu
         "Ticker", "Company", "Total Shares", "Avg Buy Price",
         "Current Price", "Target Price",
         "Current Value", "Projected Value",
-        "Value Change", "Projected Return (%)",
+        "Value Change", "Projected Price Return (%)",
     ]
     _write_headers(ws, headers, start_row=2)
     ws.freeze_panes = "A3"
@@ -1803,6 +1829,20 @@ def _sheet_health(
     h.alignment = Alignment(horizontal="left", vertical="center", indent=2)
     h.border    = Border(bottom=Side(style="medium", color=_C_GOLD))
     ws.row_dimensions[row].height = 38
+    row += 1
+
+    # Note: all health scores are script-computed — add a visible banner so readers
+    # understand these are static values that require a re-export to refresh.
+    ws.merge_cells(f"A{row}:{get_column_letter(N_COLS)}{row}")
+    hs_note           = ws.cell(row, 1,
+        f"All scores, findings, and sector weights were computed by the script on "
+        f"{datetime.now().strftime('%d %B %Y  %H:%M')}. "
+        "Re-download the report to refresh these values."
+    )
+    hs_note.font      = Font(italic=True, size=9, color="6B4C00")
+    hs_note.fill      = PatternFill("solid", fgColor=_C_AMBER_BG)
+    hs_note.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True, indent=1)
+    ws.row_dimensions[row].height = 22
     row += 1
 
     # ── Row 2: overall score ─────────────────────────────────────────────────
@@ -2010,18 +2050,30 @@ def _sheet_income(wb: Workbook, positions_df: pd.DataFrame, fund_rows: list[dict
         div_ccy = fund.get("Financial Currency") or get_ticker_currency(ticker)
         fx_rate, _ = get_fx_rate(div_ccy, currency)
 
+        # Compute per-share annual dividend in base currency so the Excel formula
+        # =C{row} * per_share_annual_div remains auditable and stays live with Shares.
+        per_share_annual_div = 0.0
         if div_rate and div_rate > 0:
-            annual_income = div_rate * total_shares * fx_rate
-            yoc = (annual_income / cost_basis * 100) if cost_basis > 0 else 0
-        else:
-            annual_income = 0
-            yoc = 0
+            # Preferred: explicit per-share dividend rate from fundamentals data
+            per_share_annual_div = div_rate * fx_rate
+        elif div_yield and div_yield > 0 and total_shares > 0:
+            # Fallback for ETFs (e.g. SPY, GLD) where Dividend Rate is not reported
+            # but Div Yield (%) is known: derive per-share from current price × yield
+            current_price_base = total_value / total_shares
+            per_share_annual_div = current_price_base * div_yield / 100
+
+        annual_income = per_share_annual_div * total_shares
+        yoc = (annual_income / cost_basis * 100) if cost_basis > 0 else 0
 
         name = name_map.get(ticker, ticker)
         ws.cell(row, 1, ticker).font = Font(bold=True, size=10)
         ws.cell(row, 2, name)
         ws.cell(row, 3, total_shares).number_format = '#,##0'
-        ws.cell(row, 4, round(annual_income, 2)).number_format = curr_fmt
+        # Write as formula so the cell is auditable: =Shares * per_share_annual_div
+        if per_share_annual_div > 0:
+            ws.cell(row, 4, f"=C{row}*{per_share_annual_div:.6f}").number_format = curr_fmt
+        else:
+            ws.cell(row, 4, 0).number_format = curr_fmt
         ws.cell(row, 5, round(div_yield, 2) if div_yield else 0).number_format = '0.00"%"'
         ws.cell(row, 6, round(yoc, 2)).number_format = '0.00"%"'
 

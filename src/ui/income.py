@@ -120,7 +120,9 @@ async def build_income_tab(
         r["amount"] for r in timeline if r["month"] >= twelve_months_ago
     )
 
-    # Projected annual income from Dividend Rate * shares * FX
+    # Projected annual income from Dividend Rate * shares * FX.
+    # Fallback: ETFs like SPY/GLD don't report Dividend Rate but do have Div Yield (%) —
+    # use yield × market value in that case.
     # dividendRate is in financialCurrency (not necessarily the trading currency)
     projected_annual = 0.0
     from src.portfolio import get_split_factor
@@ -131,11 +133,14 @@ async def build_income_tab(
         )
         fund = fund_map.get(ticker, {})
         div_rate = fund.get("Dividend Rate")
-        if not div_rate or div_rate <= 0:
-            continue
+        div_yield = fund.get("Div Yield (%)")
         div_ccy = fund.get("Financial Currency") or get_ticker_currency(ticker)
         fx_rate, _ = get_fx_rate(div_ccy, currency)
-        projected_annual += div_rate * total_shares * fx_rate
+        if div_rate and div_rate > 0:
+            projected_annual += div_rate * total_shares * fx_rate
+        elif div_yield and div_yield > 0:
+            ticker_value = df[df["Ticker"] == ticker]["Total Value"].sum()
+            projected_annual += ticker_value * div_yield / 100
 
     total_value = df.groupby("Ticker")["Total Value"].sum().sum()
     portfolio_yield = (projected_annual / total_value * 100) if total_value > 0 else 0.0
@@ -525,10 +530,11 @@ def _build_income_table(
 
             if div_rate and div_rate > 0:
                 annual_income = div_rate * total_shares * fx_rate
-                yield_on_cost = (annual_income / cost_basis * 100) if cost_basis > 0 else 0.0
+            elif div_yield and div_yield > 0:
+                annual_income = total_value * div_yield / 100
             else:
                 annual_income = 0.0
-                yield_on_cost = 0.0
+            yield_on_cost = (annual_income / cost_basis * 100) if cost_basis > 0 and annual_income > 0 else 0.0
 
             dot_color = color_map.get(ticker, "#3B82F6")
             income_str = _fmt_currency(annual_income, currency_symbol)
@@ -561,17 +567,21 @@ def _build_income_table(
         for ticker in portfolio:
             fund = fund_map.get(ticker, {})
             div_rate = fund.get("Dividend Rate")
+            div_yield_tot = fund.get("Div Yield (%)")
             ticker_df = df[df["Ticker"] == ticker]
             if ticker_df.empty:
                 continue
             total_shares = ticker_df["Shares"].sum()
             cost_basis = ticker_df["Cost Basis"].sum()
+            ticker_val = ticker_df["Total Value"].sum()
             total_cost += cost_basis
-            total_val += ticker_df["Total Value"].sum()
+            total_val += ticker_val
             if div_rate and div_rate > 0:
                 div_ccy = fund.get("Financial Currency") or get_ticker_currency(ticker)
                 fx_rate, _ = get_fx_rate(div_ccy, currency)
                 total_annual += div_rate * total_shares * fx_rate
+            elif div_yield_tot and div_yield_tot > 0:
+                total_annual += ticker_val * div_yield_tot / 100
 
         total_yield = (total_annual / total_val * 100) if total_val > 0 else 0
         total_yoc = (total_annual / total_cost * 100) if total_cost > 0 else 0
